@@ -3,7 +3,7 @@ import webpush from "npm:web-push@3.6.7";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-forwarded-for, cf-connecting-ip, x-real-ip",
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
 
@@ -22,6 +22,45 @@ function json(data: unknown, status = 200) {
 
 function normName(raw: string) {
   return String(raw || "").trim().toLowerCase().replace(/@.*$/, "");
+}
+
+
+function clientIp(req: Request, body: Record<string, unknown> = {}) {
+  const h = req.headers;
+  const raw =
+    h.get("cf-connecting-ip") ||
+    h.get("x-real-ip") ||
+    (h.get("x-forwarded-for") || "").split(",")[0].trim() ||
+    String(body.client_ip || body.ip || "") ||
+    "";
+  return raw.slice(0, 80);
+}
+
+async function assertNotBanned(ip: string) {
+  if (!ip) return;
+  const { data } = await admin.from("ip_bans").select("id,reason").eq("ip", ip).eq("active", true).limit(1);
+  if (data?.length) {
+    const err = new Error("IP gesperrt" + (data[0].reason ? ": " + data[0].reason : ""));
+    (err as Error & { status?: number }).status = 403;
+    throw err;
+  }
+}
+
+async function logIp(opts: {
+  ip: string; action: string; user_id?: string | null; user_email?: string | null;
+  user_agent?: string | null; detail?: string | null;
+}) {
+  try {
+    if (!opts.ip) return;
+    await admin.from("ip_logs").insert({
+      ip: opts.ip,
+      action: opts.action,
+      user_id: opts.user_id || null,
+      user_email: opts.user_email || null,
+      user_agent: (opts.user_agent || "").slice(0, 400),
+      detail: opts.detail || null
+    });
+  } catch { /* ignore log errors */ }
 }
 
 function randomCode() {
@@ -75,6 +114,8 @@ Deno.serve(async req => {
     const action = String(body.action || "");
 
     if (action === "register") {
+      const ip = clientIp(req, body);
+      await assertNotBanned(ip);
       const name = normName(body.username);
       const password = String(body.password || "");
       const password2 = String(body.password2 || body.passwordConfirm || "");
@@ -83,7 +124,7 @@ Deno.serve(async req => {
       }
       if (password.length < 6) return json({ error: "Passwort mindestens 6 Zeichen." }, 400);
       if (password !== password2) return json({ error: "Passwörter stimmen nicht überein." }, 400);
-      if (name === "admin" || `${name}@${DOMAIN}` === ADMIN) {
+      if (name === "admin" || isAdminEmail(`${name}@${DOMAIN}`)) {
         return json({ error: "Dieser Name ist reserviert." }, 400);
       }
       const email = `${name}@${DOMAIN}`;
@@ -99,9 +140,21 @@ Deno.serve(async req => {
         }
         throw error;
       }
+      // Schreibrecht (Trigger macht das auch; hier explizit)
+      if (data.user?.id) {
+        await admin.from("klassen_hu_permissions").upsert({
+          user_id: data.user.id,
+          user_email: email,
+          can_write: true
+        }, { onConflict: "user_id" });
+      }
+      await logIp({
+        ip, action: "register", user_id: data.user?.id, user_email: email,
+        user_agent: req.headers.get("user-agent"), detail: "self-register"
+      });
       await notifyAdmin(
         "Neuer Account",
-        `${name} hat sich registriert.`,
+        `${name} hat sich registriert (${ip || "IP?"}).`,
         "user-register"
       );
       return json({ ok: true, email: data.user?.email, name });
@@ -206,8 +259,79 @@ Deno.serve(async req => {
       return json({ resets: data || [] });
     }
 
+    
+    if (action === "log_session") {
+      const ip = clientIp(req, body);
+      await assertNotBanned(ip);
+      const auth = req.headers.get("Authorization");
+      let user_id: string | null = null;
+      let user_email: string | null = null;
+      if (auth) {
+        const token = auth.replace(/^Bearer\s+/i, "");
+        const { data: { user } } = await admin.auth.getUser(token);
+        user_id = user?.id || null;
+        user_email = user?.email || null;
+      }
+      if (!user_id && body.user_email) user_email = String(body.user_email);
+      await logIp({
+        ip,
+        action: String(body.event || "login"),
+        user_id,
+        user_email,
+        user_agent: req.headers.get("user-agent") || String(body.user_agent || ""),
+        detail: String(body.detail || "session")
+      });
+      return json({ ok: true, ip: ip || null });
+    }
+
+    if (action === "check_ban") {
+      const ip = clientIp(req, body);
+      const banned = ip ? await admin.from("ip_bans").select("reason").eq("ip", ip).eq("active", true).maybeSingle() : { data: null };
+      return json({ banned: !!banned.data, reason: banned.data?.reason || null, ip: ip || null });
+    }
+
+    if (action === "list_ip_logs" || action === "list_ip_bans" || action === "ban_ip" || action === "unban_ip") {
+      const auth = req.headers.get("Authorization");
+      if (!auth) return json({ error: "Unauthorized" }, 401);
+      const token = auth.replace(/^Bearer\s+/i, "");
+      const { data: { user }, error: userError } = await admin.auth.getUser(token);
+      if (userError || !user || !isAdminEmail(user.email || "")) return json({ error: "Forbidden" }, 403);
+
+      if (action === "list_ip_logs") {
+        const { data, error } = await admin.from("ip_logs").select("*").order("created_at", { ascending: false }).limit(100);
+        if (error) throw error;
+        return json({ logs: data || [] });
+      }
+      if (action === "list_ip_bans") {
+        const { data, error } = await admin.from("ip_bans").select("*").order("created_at", { ascending: false }).limit(100);
+        if (error) throw error;
+        return json({ bans: data || [] });
+      }
+      if (action === "ban_ip") {
+        const ip = String(body.ip || "").trim();
+        if (!ip) return json({ error: "IP fehlt." }, 400);
+        const reason = String(body.reason || "");
+        const { error } = await admin.from("ip_bans").upsert({
+          ip, reason, active: true, banned_by: user.email
+        }, { onConflict: "ip" });
+        if (error) throw error;
+        await logIp({ ip, action: "ban", user_email: user.email, detail: reason });
+        return json({ ok: true });
+      }
+      if (action === "unban_ip") {
+        const ip = String(body.ip || "").trim();
+        if (!ip) return json({ error: "IP fehlt." }, 400);
+        const { error } = await admin.from("ip_bans").update({ active: false }).eq("ip", ip);
+        if (error) throw error;
+        await logIp({ ip, action: "unban", user_email: user.email });
+        return json({ ok: true });
+      }
+    }
+
     return json({ error: "Unbekannte Aktion." }, 400);
   } catch (e) {
-    return json({ error: String((e as Error)?.message || e) }, 500);
+    const msg = String((e as Error)?.message || e);
+    const status = (e as { status?: number })?.status || (msg.startsWith("IP gesperrt") ? 403 : 500);
+    return json({ error: msg }, status);
   }
 });
