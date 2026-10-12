@@ -1,0 +1,14 @@
+{
+  "name": "Hausübungen",
+  "short_name": "Hausübungen",
+  "description": "Persönliche und Klassen-Hausübungen mit Dateien und Benachrichtigungen.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {"src":"icon.jpg","sizes":"512x512","type":"image/jpeg","purpose":"any maskable"}
+  ]
+}
