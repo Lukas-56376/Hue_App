@@ -13,29 +13,58 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.jpg">
 <link rel="icon" href="icon.jpg">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<section id="banScreen" hidden>
-  <div class="ban-wrap">
-    <div class="ban-badge"><span class="ban-dot"></span> Zugriff gesperrt</div>
-    <div class="ban-icon" aria-hidden="true">⊘</div>
-    <h1 class="ban-title">Du wurdest <span>gebannt</span></h1>
-    <p class="ban-sub">Der Zugriff auf die Hausübungen-App ist für dieses Netzwerk vorübergehend oder dauerhaft gesperrt.<br>
-      Falls das ein Fehler ist, wende dich an einen Admin (DaWeed / Nico).</p>
-    <div class="ban-card">
-      <div class="ban-row"><span class="ban-k">⚠ Grund</span><span class="ban-v" id="banReason">—</span></div>
-      <div class="ban-row"><span class="ban-k">▣ Gebannt am</span><span class="ban-v" id="banWhen">—</span></div>
-      <div class="ban-row"><span class="ban-k">⏱ Ablauf</span><span class="ban-v ban-permanent">Dauerhaft</span></div>
-      <div class="ban-row"><span class="ban-k">◇ IP</span><span class="ban-v" id="banIpShow">—</span></div>
-      <div class="ban-row"><span class="ban-k">◎ Gebannt durch</span><span class="ban-v">Administrator</span></div>
+<section id="banScreen" class="state-screen state-ban" hidden>
+  <div class="state-wrap">
+    <div class="state-icon ban-ico" aria-hidden="true">
+      <svg width="56" height="56" viewBox="0 0 56 56" fill="none"><circle cx="28" cy="28" r="26" stroke="currentColor" stroke-width="2.5"/><path d="M16 16l24 24M40 16L16 40" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
     </div>
-    <button type="button" class="ban-back" id="banRetry">← Erneut prüfen</button>
-    <p class="ban-foot">— Danke für dein Verständnis. —</p>
+    <p class="state-eyebrow">Zugriff gesperrt</p>
+    <h1 class="state-title">Du wurdest gebannt</h1>
+    <p class="state-sub">Dieses Netzwerk oder Gerät darf die Hausübungen-App derzeit nicht nutzen. Bei einem Fehler wende dich an DaWeed oder Nico.</p>
+    <div class="state-card">
+      <div class="state-row"><span>Grund</span><strong id="banReason">—</strong></div>
+      <div class="state-row"><span>Gebannt am</span><strong id="banWhen">—</strong></div>
+      <div class="state-row"><span>Ablauf</span><strong class="state-danger">Dauerhaft</strong></div>
+      <div class="state-row"><span>IP</span><strong id="banIpShow">—</strong></div>
+      <div class="state-row"><span>Durch</span><strong>Administrator</strong></div>
+    </div>
+    <button type="button" class="btn-primary" id="banRetry">Erneut prüfen</button>
+    <p class="state-foot">Hausübungen </p>
+  </div>
+</section>
+
+<section id="maintScreen" class="state-screen state-maint" hidden>
+  <div class="state-wrap">
+    <div class="state-icon maint-ico" aria-hidden="true">
+      <svg width="56" height="56" viewBox="0 0 56 56" fill="none"><path d="M28 12v8M28 36v8M12 28h8M36 28h8M17 17l5.5 5.5M33.5 33.5L39 39M39 17l-5.5 5.5M22.5 33.5L17 39" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><circle cx="28" cy="28" r="8" stroke="currentColor" stroke-width="2.5"/></svg>
+    </div>
+    <p class="state-eyebrow">System</p>
+    <h1 class="state-title">Wartungsarbeiten</h1>
+    <p class="state-sub" id="maintMessage">Die App wird gerade gewartet. Bitte versuche es später erneut. Admins sind nicht betroffen.</p>
+    <button type="button" class="btn-primary" id="maintRetry">Erneut versuchen</button>
+    <p class="state-foot">Hausübungen </p>
+  </div>
+</section>
+
+<section id="pushGate" class="state-screen state-push" hidden>
+  <div class="state-wrap state-wrap-wide">
+    <div class="state-icon push-ico" aria-hidden="true">
+      <svg width="56" height="56" viewBox="0 0 56 56" fill="none"><path d="M28 10c-7.2 0-13 5.8-13 13v6.2l-3.4 5.1A2 2 0 0 0 13.3 38h29.4a2 2 0 0 0 1.7-3.7L41 29.2V23c0-7.2-5.8-13-13-13Z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M23 38a5 5 0 0 0 10 0" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+    </div>
+    <p class="state-eyebrow">Erforderlich</p>
+    <h1 class="state-title">Benachrichtigungen aktivieren</h1>
+    <p class="state-sub">Ohne Push verpasst du neue Klassen-HÜ, Erinnerungen und Ankündigungen. Bitte erlaube Benachrichtigungen, um fortzufahren.</p>
+    <button type="button" class="btn-primary" id="pushAllowBtn">Benachrichtigungen erlauben</button>
+    <button type="button" class="btn-secondary" id="pushRecheckBtn">Erneut prüfen</button>
+    <div class="push-help" id="pushHelp">
+      <h3>So aktivierst du sie</h3>
+      <div id="pushHelpBody"></div>
+    </div>
+    <p class="state-foot field-help" id="pushGateStatus"></p>
   </div>
 </section>
 
@@ -51,8 +80,7 @@
 
 <section id="auth" hidden>
   <h1>Hausübungen</h1>
-  <p class="sub" id="authSub">Melde dich an – funktioniert auf mehreren Geräten und über VPN/WLAN.</p>
-
+  
   <div id="authLogin">
     <div class="field"><label for="aUser">Benutzername</label><input type="text" id="aUser" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="dein Benutzername"></div>
     <div class="field"><label for="aPass">Passwort</label><input type="password" id="aPass" autocomplete="current-password" placeholder="dein Passwort"></div>
@@ -188,10 +216,11 @@
         <h4 style="margin:14px 0 6px;font-size:14px">Letzte Zugriffe</h4>
         <div id="ipLogList" class="permission-list"></div>
         <button type="button" class="small-btn" id="refreshIpLog" style="margin-top:8px">Aktualisieren</button>
+        <button type="button" class="small-btn" id="previewBanBtn" style="margin-top:8px">Vorschau Ban</button>
       </div>
       <div class="admin-card">
         <h3>Passwort-Reset-Codes</h3>
-        <p class="field-help">Codes, die User angefordert haben (auch per Push an dich).</p>
+        <p class="field-help">Codes, die User angefordert haben.</p>
         <div id="resetCodeList" class="permission-list"></div>
         <button type="button" class="small-btn" id="refreshResetCodes" style="margin-top:8px">Aktualisieren</button>
       </div>
@@ -226,7 +255,7 @@
 
       <div class="admin-card">
         <h3>Admins & Rechte</h3>
-        <p class="field-help">Gleicher Admin-Rang. Fest eingetragene Admins (Config) bleiben. Weitere kannst du hinzufügen oder entziehen.</p>
+        <p class="field-help">Fest eingetragene Admins bleiben. Weitere kannst du hinzufügen oder entziehen.</p>
         <div id="roleAdminList" class="permission-list"></div>
         <div class="user-add" style="margin-top:14px;display:grid;gap:8px">
           <input type="text" id="newAdminName" placeholder="Benutzername (wird Admin)" autocapitalize="none" autocomplete="off">
@@ -240,6 +269,7 @@
         <p class="field-help">Sperrt die App für alle, die kein Admin sind.</p>
         <div class="check-row"><input type="checkbox" id="maintToggle"><label for="maintToggle" style="margin:0">Wartungsmodus aktiv</label></div>
         <button type="button" class="small-btn" id="maintSaveBtn" style="margin-top:8px">Speichern</button>
+        <button type="button" class="small-btn" id="previewMaintBtn" style="margin-top:8px">Vorschau Wartung</button>
         <p class="field-help" id="maintMsg" style="margin-top:8px"></p>
       </div>
 
@@ -317,11 +347,6 @@
         <button type="button" class="small-btn" id="pingStatusBtn">Status prüfen</button>
       </div>
 
-      <div class="admin-card">
-        <h3>Backup</h3>
-        <p class="field-help" id="backupNote">Supabase Dashboard → Database → Backups. Regelmäßig prüfen.</p>
-        <p class="field-help"><a href="https://supabase.com/dashboard/project/pfyyhsxsmlsfepbjahyr/database/backups" target="_blank" rel="noopener">Backups im Dashboard öffnen</a></p>
-      </div>
     </section>
   </div>
 
@@ -447,6 +472,7 @@ let view = "personal", editingId = null, classEditingId = null, saving = false, 
 let personalFiles = [], classFiles = [], suFiles = [], suItems = [], suEditingId = null, channels = [];
 let filterSubject = "", filterDue = "", filterImportant = false;
 let dragSrcId = null;
+let screenPreview = null;
 
 if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) throw new Error("config missing");
 
@@ -646,25 +672,143 @@ function updateAdminUI() {
 /* ─── Auth ─── */
 
 function showBanScreen(reason, ip) {
-  // Sofort volle Ban-Ansicht – kein Login, keine App
   $("auth").hidden = true;
   $("app").hidden = true;
   const nf = $("notFoundScreen"); if (nf) nf.hidden = true;
+  if ($("maintScreen")) $("maintScreen").hidden = true;
+  if ($("pushGate")) $("pushGate").hidden = true;
   const b = $("banScreen");
   if (!b) return;
   b.hidden = false;
-  document.body.classList.add("banned");
+  document.body.classList.add("state-lock");
   if ($("banReason")) $("banReason").textContent = reason || "Verstoß gegen die Server-Regeln";
   if ($("banIpShow")) $("banIpShow").textContent = ip || "—";
   if ($("banWhen")) $("banWhen").textContent = new Date().toLocaleString("de-AT", { dateStyle: "medium", timeStyle: "short" });
   try {
-    if (!location.hash.toLowerCase().includes("banned")) location.replace(location.pathname + location.search + "#/banned");
+    if (!screenPreview && !location.hash.toLowerCase().includes("banned")) location.replace(location.pathname + location.search + "#/banned");
   } catch {}
 }
 function hideBanScreen() {
   const b = $("banScreen");
   if (b) b.hidden = true;
-  document.body.classList.remove("banned");
+  document.body.classList.remove("state-lock", "banned");
+}
+function showMaintScreen(msg) {
+  $("auth").hidden = true;
+  $("app").hidden = true;
+  if ($("banScreen")) $("banScreen").hidden = true;
+  if ($("pushGate")) $("pushGate").hidden = true;
+  const nf = $("notFoundScreen"); if (nf) nf.hidden = true;
+  const m = $("maintScreen");
+  if (!m) return;
+  m.hidden = false;
+  document.body.classList.add("state-lock");
+  if ($("maintMessage") && msg) $("maintMessage").textContent = msg;
+}
+function hideMaintScreen() {
+  const m = $("maintScreen");
+  if (m) m.hidden = true;
+  if (!screenPreview && $("banScreen")?.hidden !== false) document.body.classList.remove("state-lock");
+}
+function exitScreenPreview() {
+  if (!screenPreview) return;
+  const kind = screenPreview;
+  screenPreview = null;
+  hideBanScreen();
+  hideMaintScreen();
+  document.body.classList.remove("state-lock");
+  $("app").hidden = false;
+  $("auth").hidden = true;
+  if (kind === "ban" && location.hash.toLowerCase().includes("banned")) {
+    try { history.replaceState(null, "", "#/admin"); } catch {}
+  }
+  if (isAdmin()) setMainView("admin");
+}
+function openBanPreview() {
+  if (!isAdmin()) return;
+  screenPreview = "ban";
+  showBanScreen("Vorschau", "0.0.0.0");
+  $("banRetry").textContent = "Schließen";
+}
+async function openMaintPreview() {
+  if (!isAdmin()) return;
+  screenPreview = "maint";
+  let msg = "Die App wird gerade gewartet. Bitte versuche es später erneut. Admins sind nicht betroffen.";
+  try {
+    const custom = await settingGet("maintenance_message");
+    if (custom && custom.trim()) msg = custom.trim();
+  } catch {}
+  showMaintScreen(msg);
+  if ($("maintRetry")) $("maintRetry").textContent = "Schließen";
+}
+function pushPlatformHelp() {
+  const ua = navigator.userAgent || "";
+  const isiOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(ua);
+  if (isiOS) {
+    return `<ol class="help-steps">
+      <li>Öffne die Seite in <strong>Safari</strong>.</li>
+      <li>Tippe auf <strong>Teilen</strong> → <strong>Zum Home-Bildschirm</strong>.</li>
+      <li>Öffne die App vom Home-Bildschirm.</li>
+      <li>Wenn der Dialog kommt: <strong>Erlauben</strong>.</li>
+      <li>Sonst: <strong>Einstellungen → Mitteilungen</strong> → Safari bzw. Hausübungen → erlauben.</li>
+      <li>Danach hier <strong>Erneut prüfen</strong>.</li>
+    </ol>`;
+  }
+  if (isAndroid) {
+    return `<ol class="help-steps">
+      <li>Im Dialog auf <strong>Zulassen</strong> tippen.</li>
+      <li>Falls blockiert: Menü <strong>⋮ → Website-Einstellungen → Benachrichtigungen → Zulassen</strong>.</li>
+      <li>Oder Chrome-Einstellungen → Website-Einstellungen → Benachrichtigungen.</li>
+      <li>Seite neu laden und <strong>Erneut prüfen</strong>.</li>
+    </ol>`;
+  }
+  return `<ol class="help-steps">
+    <li>Auf <strong>Benachrichtigungen erlauben</strong> klicken und im Browser-Dialog zustimmen.</li>
+    <li>Falls blockiert: <strong>Schloss-Symbol</strong> in der Adressleiste → Benachrichtigungen → <strong>Zulassen</strong>.</li>
+    <li>Chrome/Edge: auch unter Website-Einstellungen möglich.</li>
+    <li>Firefox: Schloss → Berechtigungen → Benachrichtigungen.</li>
+    <li>Danach <strong>Erneut prüfen</strong>.</li>
+  </ol>`;
+}
+async function ensurePushGate() {
+  // Pflicht: ohne granted + Abo kein App-Zugang
+  if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+    showPushGate("Dieser Browser unterstützt kein Web-Push. Bitte Chrome, Edge, Firefox oder Safari (Home-Bildschirm) nutzen.");
+    return false;
+  }
+  if (Notification.permission === "granted") {
+    const r = await registerPush({ askIfNeeded: false, forceAsk: false });
+    if (r.ok) {
+      hidePushGate();
+      return true;
+    }
+  }
+  showPushGate();
+  return false;
+}
+function showPushGate(statusText) {
+  $("auth").hidden = true;
+  $("app").hidden = true;
+  if ($("banScreen")) $("banScreen").hidden = true;
+  if ($("maintScreen")) $("maintScreen").hidden = true;
+  const g = $("pushGate");
+  if (!g) return;
+  g.hidden = false;
+  document.body.classList.add("state-lock");
+  if ($("pushHelpBody")) $("pushHelpBody").innerHTML = pushPlatformHelp();
+  if ($("pushGateStatus")) $("pushGateStatus").textContent = statusText || (
+    Notification.permission === "denied"
+      ? "Berechtigung ist blockiert – bitte in den Browser-/Systemeinstellungen zulassen."
+      : "Noch nicht aktiviert."
+  );
+}
+function hidePushGate() {
+  const g = $("pushGate");
+  if (g) g.hidden = true;
+  if ($("banScreen")?.hidden !== false && $("maintScreen")?.hidden !== false) {
+    document.body.classList.remove("state-lock");
+  }
 }
 async function checkIpBanOnStart() {
   try {
@@ -677,6 +821,11 @@ async function checkIpBanOnStart() {
   return false;
 }
 $("banRetry")?.addEventListener("click", async () => {
+  if (screenPreview === "ban") {
+    $("banRetry").textContent = "Erneut prüfen";
+    exitScreenPreview();
+    return;
+  }
   $("banRetry").disabled = true;
   $("banRetry").textContent = "Prüfe …";
   const banned = await checkIpBanOnStart();
@@ -685,30 +834,85 @@ $("banRetry")?.addEventListener("click", async () => {
   if (!banned) {
     hideBanScreen();
     showAuth();
-    toast("Nicht mehr gesperrt – du kannst dich anmelden.");
+  }
+});
+$("maintRetry")?.addEventListener("click", async () => {
+  if (screenPreview === "maint") {
+    $("maintRetry").textContent = "Erneut versuchen";
+    exitScreenPreview();
+    return;
+  }
+  $("maintRetry").disabled = true;
+  const still = await blockIfMaintenance();
+  $("maintRetry").disabled = false;
+  if (!still) {
+    hideMaintScreen();
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) await showApp(session);
+    else showAuth();
+  }
+});
+$("previewBanBtn")?.addEventListener("click", () => openBanPreview());
+$("previewMaintBtn")?.addEventListener("click", () => openMaintPreview());
+$("pushAllowBtn")?.addEventListener("click", async () => {
+  $("pushAllowBtn").disabled = true;
+  $("pushAllowBtn").textContent = "Bitte warten …";
+  const r = await registerPush({ askIfNeeded: true, forceAsk: true });
+  $("pushAllowBtn").disabled = false;
+  $("pushAllowBtn").textContent = "Benachrichtigungen erlauben";
+  if (r.ok) {
+    hidePushGate();
+    $("app").hidden = false;
+    await loadPublicNotices();
+    await loadPermissions();
+    await Promise.all([loadPersonal(), loadClass(), loadUnterlagen()]);
+    subscribeAll();
+    applyHashRoute();
+    updateAdminUI();
+    setMainView("personal");
+    toast("Benachrichtigungen aktiv.");
+  } else {
+    showPushGate(r.reason || "Noch nicht erlaubt.");
+  }
+});
+$("pushRecheckBtn")?.addEventListener("click", async () => {
+  if (await ensurePushGate()) {
+    $("app").hidden = false;
+    await loadPublicNotices();
+    await loadPermissions();
+    await Promise.all([loadPersonal(), loadClass(), loadUnterlagen()]);
+    subscribeAll();
+    applyHashRoute();
+    updateAdminUI();
+    setMainView("personal");
+    toast("Push ist aktiv.");
   }
 });
 function showAuth() {
   hideBanScreen();
+  hideMaintScreen();
+  hidePushGate();
   hideNotFound();
   $("auth").hidden = false; $("app").hidden = true;
   channels.forEach(c => sb.removeChannel(c)); channels = [];
 }
 async function showApp(session) {
   user = session.user;
-  $("auth").hidden = true; $("app").hidden = false;
+  $("auth").hidden = true;
   $("acctName").textContent = toName(user.email);
   fillSubjectSelect();
   await loadExtraAdmins();
-  await loadPublicNotices();
   if (await blockIfMaintenance()) return;
+  // Push ist Pflicht – App erst nach Erlaubnis
+  if (!(await ensurePushGate())) return;
+  $("app").hidden = false;
+  await loadPublicNotices();
   await loadPermissions();
   await Promise.all([loadPersonal(), loadClass(), loadUnterlagen()]);
   subscribeAll();
   applyHashRoute();
   updateAdminUI();
   setMainView("personal");
-  registerPush({ askIfNeeded: true });
 }
 
 async function callPublicAuth(payload) {
@@ -1248,17 +1452,14 @@ async function loadPublicNotices() {
 }
 async function blockIfMaintenance() {
   let on = false;
-  try { on = (await settingGet("maintenance")) === "true"; } catch { return false; }
+  let msg = "Die App wird gerade gewartet. Bitte versuche es später erneut. Admins sind nicht betroffen.";
+  try {
+    on = (await settingGet("maintenance")) === "true";
+    const custom = await settingGet("maintenance_message");
+    if (custom && custom.trim()) msg = custom.trim();
+  } catch { return false; }
   if (!on || isAdmin()) return false;
-  $("app").hidden = true;
-  $("auth").hidden = true;
-  if ($("banScreen")) {
-    $("banScreen").hidden = false;
-    if ($("banReason")) $("banReason").textContent = "Wartungsmodus – bitte später erneut versuchen.";
-    if ($("banIpShow")) $("banIpShow").textContent = "—";
-    const title = document.querySelector(".ban-title");
-    if (title) title.innerHTML = "Wartung";
-  }
+  showMaintScreen(msg);
   return true;
 }
 async function loadBroadcastFeed() {
@@ -1453,8 +1654,6 @@ async function pingSystem() {
     if (cron) cron.textContent = at
       ? `Letzter Erinnerungs-Lauf: ${new Date(at).toLocaleString("de-AT")} · gesendet: ${sent || "0"}`
       : "Noch kein Erinnerungs-Lauf protokolliert (Function daily-reminders neu deployen).";
-    const note = await settingGet("backup_note");
-    if (note && $("backupNote")) $("backupNote").textContent = note;
   } catch {
     if (cron) cron.textContent = "Cron-Status nicht lesbar (SQL admin-features.sql ausführen).";
   }
@@ -1807,7 +2006,7 @@ async function registerPush(opts = { askIfNeeded: true }) {
     const reg = await navigator.serviceWorker.register("./sw.js");
     let perm = Notification.permission;
     const alreadyAsked = localStorage.getItem(PUSH_ASKED_KEY) === "1";
-    if (perm === "default" && opts.askIfNeeded && !alreadyAsked) {
+    if (perm === "default" && (opts.forceAsk || (opts.askIfNeeded && !alreadyAsked))) {
       perm = await Notification.requestPermission();
       localStorage.setItem(PUSH_ASKED_KEY, "1");
     }
@@ -2778,13 +2977,106 @@ function hideSheet(sheetId, scrimId) {
 }
 
 /* ─── Realtime ─── */
+let banPollTimer = null;
+function rtDebounce(fn, ms) {
+  let t;
+  return () => { clearTimeout(t); t = setTimeout(() => { try { fn(); } catch {} }, ms); };
+}
+async function onRealtimeSettings() {
+  if (screenPreview) return;
+  try { await loadPublicNotices(); } catch {}
+  if (!isAdmin()) {
+    const blocked = await blockIfMaintenance();
+    if (blocked) return;
+    if ($("maintScreen") && !$("maintScreen").hidden) {
+      hideMaintScreen();
+      $("app").hidden = false;
+    }
+  } else if ($("maintToggle")) {
+    try { $("maintToggle").checked = (await settingGet("maintenance")) === "true"; } catch {}
+  }
+}
+let lastBanState = null;
+async function onRealtimeBanCheck() {
+  if (screenPreview) return;
+  try {
+    const chk = await callPublicAuth({ action: "check_ban" });
+    const banned = !!chk.json?.banned;
+    if (banned) {
+      lastBanState = true;
+      if ($("banScreen")?.hidden !== false) {
+        showBanScreen(chk.json.reason, chk.json.ip);
+      } else {
+        if ($("banReason") && chk.json.reason) $("banReason").textContent = chk.json.reason;
+        if ($("banIpShow") && chk.json.ip) $("banIpShow").textContent = chk.json.ip;
+      }
+      if (user) {
+        try { await sb.auth.signOut(); } catch {}
+        user = null;
+      }
+      return true;
+    }
+    if (lastBanState === true || ($("banScreen") && !$("banScreen").hidden)) {
+      lastBanState = false;
+      hideBanScreen();
+      if (!user) {
+        const { data: { session } } = await sb.auth.getSession();
+        if (session) await showApp(session);
+        else showAuth();
+      }
+    } else {
+      lastBanState = false;
+    }
+  } catch {}
+  return false;
+}
+function startBanWatcher() {
+  if (banPollTimer) clearInterval(banPollTimer);
+  banPollTimer = setInterval(() => onRealtimeBanCheck(), 3000);
+  onRealtimeBanCheck();
+  if (!window.__huVisBan) {
+    window.__huVisBan = true;
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") onRealtimeBanCheck();
+    });
+    window.addEventListener("focus", () => onRealtimeBanCheck());
+  }
+}
 function subscribeAll() {
   channels.forEach(c => sb.removeChannel(c));
   channels = [];
-  channels.push(sb.channel("personal-hu").on("postgres_changes", { event: "*", schema: "public", table: TABLE }, () => loadPersonal()).subscribe());
-  channels.push(sb.channel("class-hu").on("postgres_changes", { event: "*", schema: "public", table: CLASS_TABLE }, () => loadClass()).subscribe());
-  channels.push(sb.channel("unterlagen").on("postgres_changes", { event: "*", schema: "public", table: SU_TABLE }, () => loadUnterlagen()).subscribe());
-  channels.push(sb.channel("perms").on("postgres_changes", { event: "*", schema: "public", table: PERM_TABLE }, () => loadPermissions()).subscribe());
+  startBanWatcher();
+  const dPersonal = rtDebounce(() => loadPersonal(), 200);
+  const dClass = rtDebounce(() => loadClass(), 200);
+  const dSu = rtDebounce(() => loadUnterlagen(), 200);
+  const dPerm = rtDebounce(() => { loadPermissions(); if (isAdmin()) loadAdminUsers(); }, 200);
+  const dFiles = rtDebounce(() => { loadPersonal(); loadClass(); }, 300);
+  const dComments = rtDebounce(() => { if (view === "class") loadClass(); if (view === "personal") loadPersonal(); }, 250);
+  const dSettings = rtDebounce(() => onRealtimeSettings(), 150);
+  const dBroadcast = rtDebounce(() => loadBroadcastFeed(), 200);
+  const dActivity = rtDebounce(() => { if (isAdmin() && view === "admin") loadActivity(); }, 400);
+  const dAdmin = rtDebounce(() => { if (isAdmin() && view === "admin") { loadIpAdmin(); loadAdminHub(); if (typeof loadReports === "function") loadReports(); } }, 500);
+  channels.push(sb.channel("rt-personal").on("postgres_changes", { event: "*", schema: "public", table: TABLE }, dPersonal).subscribe());
+  channels.push(sb.channel("rt-class").on("postgres_changes", { event: "*", schema: "public", table: CLASS_TABLE }, dClass).subscribe());
+  channels.push(sb.channel("rt-comp").on("postgres_changes", { event: "*", schema: "public", table: COMP_TABLE }, dClass).subscribe());
+  channels.push(sb.channel("rt-su").on("postgres_changes", { event: "*", schema: "public", table: SU_TABLE }, dSu).subscribe());
+  channels.push(sb.channel("rt-perm").on("postgres_changes", { event: "*", schema: "public", table: PERM_TABLE }, dPerm).subscribe());
+  channels.push(sb.channel("rt-files").on("postgres_changes", { event: "*", schema: "public", table: FILE_TABLE }, dFiles).subscribe());
+  channels.push(sb.channel("rt-sol").on("postgres_changes", { event: "*", schema: "public", table: SOL_TABLE }, dClass).subscribe());
+  channels.push(sb.channel("rt-comments").on("postgres_changes", { event: "*", schema: "public", table: COMMENTS_TABLE }, dComments).subscribe());
+  channels.push(sb.channel("rt-links").on("postgres_changes", { event: "*", schema: "public", table: LINKS_TABLE }, dComments).subscribe());
+  channels.push(sb.channel("rt-settings").on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, dSettings).subscribe());
+  channels.push(sb.channel("rt-broadcast").on("postgres_changes", { event: "*", schema: "public", table: "app_broadcasts" }, dBroadcast).subscribe());
+  channels.push(sb.channel("rt-admins").on("postgres_changes", { event: "*", schema: "public", table: "app_admins" }, rtDebounce(async () => { await loadExtraAdmins(); updateAdminUI(); if (isAdmin() && view === "admin") loadRoleAdmins(); }, 300)).subscribe());
+  channels.push(sb.channel("rt-logs").on("postgres_changes", { event: "*", schema: "public", table: LOG_TABLE }, dActivity).subscribe());
+  channels.push(sb.channel("rt-ipbans").on("postgres_changes", { event: "*", schema: "public", table: "ip_bans" }, () => { onRealtimeBanCheck(); dAdmin(); }).subscribe());
+  channels.push(sb.channel("rt-reports").on("postgres_changes", { event: "*", schema: "public", table: "content_reports" }, dAdmin).subscribe());
+  if (!window.__huVisRt) {
+    window.__huVisRt = true;
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") onRealtimeSettings();
+    });
+  }
 }
 
 /* ─── Tabs ─── */
@@ -2801,8 +3093,10 @@ $("nfHome")?.addEventListener("click", () => {
 $("today").textContent = new Date().toLocaleDateString("de-AT", { weekday: "long", day: "numeric", month: "long" });
 
 // Ban hat Vorrang vor Login/Session → direkt Ban-Screen
+startBanWatcher();
 const bannedAtStart = await checkIpBanOnStart();
 if (bannedAtStart) {
+  lastBanState = true;
   // Session ggf. beenden, damit gebannte IPs nicht in der App landen
   try { await sb.auth.signOut(); } catch {}
   user = null;
