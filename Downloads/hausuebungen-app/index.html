@@ -55,13 +55,13 @@
     <div class="state-icon push-ico" aria-hidden="true">
       <svg width="56" height="56" viewBox="0 0 56 56" fill="none"><path d="M28 10c-7.2 0-13 5.8-13 13v6.2l-3.4 5.1A2 2 0 0 0 13.3 38h29.4a2 2 0 0 0 1.7-3.7L41 29.2V23c0-7.2-5.8-13-13-13Z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M23 38a5 5 0 0 0 10 0" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
     </div>
-    <p class="state-eyebrow">Erforderlich</p>
-    <h1 class="state-title">Benachrichtigungen aktivieren</h1>
-    <p class="state-sub">Ohne Push verpasst du neue Klassen-HÜ, Erinnerungen und Ankündigungen. Bitte erlaube Benachrichtigungen, um fortzufahren.</p>
-    <button type="button" class="btn-primary" id="pushAllowBtn">Benachrichtigungen erlauben</button>
-    <button type="button" class="btn-secondary" id="pushRecheckBtn">Erneut prüfen</button>
+    <p class="state-eyebrow">Empfohlen</p>
+    <h1 class="state-title">Benachrichtigungen</h1>
+    <p class="state-sub">Mit Push siehst du sofort neue Klassen-HÜ, Erinnerungen einen Tag vorher und Ankündigungen – auch wenn die App zu ist. Du kannst das jederzeit in den Browser-Einstellungen ändern.</p>
+    <button type="button" class="btn-primary" id="pushAllowBtn">Erlauben</button>
+    <button type="button" class="btn-secondary" id="pushSkipBtn">Später</button>
     <div class="push-help" id="pushHelp">
-      <h3>So aktivierst du sie</h3>
+      <h3>Falls der Dialog nicht erscheint</h3>
       <div id="pushHelpBody"></div>
     </div>
     <p class="state-foot field-help" id="pushGateStatus"></p>
@@ -773,37 +773,30 @@ function pushPlatformHelp() {
     <li>Danach <strong>Erneut prüfen</strong>.</li>
   </ol>`;
 }
-async function ensurePushGate() {
-  // Pflicht: ohne granted + Abo kein App-Zugang
+async function maybeAskPushOnce() {
   if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
-    showPushGate("Dieser Browser unterstützt kein Web-Push. Bitte Chrome, Edge, Firefox oder Safari (Home-Bildschirm) nutzen.");
-    return false;
+    return;
   }
   if (Notification.permission === "granted") {
-    const r = await registerPush({ askIfNeeded: false, forceAsk: false });
-    if (r.ok) {
-      hidePushGate();
-      return true;
-    }
+    await registerPush({ askIfNeeded: false, forceAsk: false });
+    return;
+  }
+  if (localStorage.getItem(PUSH_ASKED_KEY) === "1") return;
+  if (Notification.permission === "denied") {
+    localStorage.setItem(PUSH_ASKED_KEY, "1");
+    return;
   }
   showPushGate();
-  return false;
 }
 function showPushGate(statusText) {
-  $("auth").hidden = true;
-  $("app").hidden = true;
-  if ($("banScreen")) $("banScreen").hidden = true;
-  if ($("maintScreen")) $("maintScreen").hidden = true;
+  if ($("banScreen") && !$("banScreen").hidden) return;
+  if ($("maintScreen") && !$("maintScreen").hidden) return;
   const g = $("pushGate");
   if (!g) return;
   g.hidden = false;
   document.body.classList.add("state-lock");
   if ($("pushHelpBody")) $("pushHelpBody").innerHTML = pushPlatformHelp();
-  if ($("pushGateStatus")) $("pushGateStatus").textContent = statusText || (
-    Notification.permission === "denied"
-      ? "Berechtigung ist blockiert – bitte in den Browser-/Systemeinstellungen zulassen."
-      : "Noch nicht aktiviert."
-  );
+  if ($("pushGateStatus")) $("pushGateStatus").textContent = statusText || "";
 }
 function hidePushGate() {
   const g = $("pushGate");
@@ -811,6 +804,10 @@ function hidePushGate() {
   if ($("banScreen")?.hidden !== false && $("maintScreen")?.hidden !== false) {
     document.body.classList.remove("state-lock");
   }
+}
+function finishPushPrompt() {
+  localStorage.setItem(PUSH_ASKED_KEY, "1");
+  hidePushGate();
 }
 async function checkIpBanOnStart() {
   try {
@@ -858,37 +855,14 @@ $("previewBanBtn")?.addEventListener("click", () => openBanPreview());
 $("previewMaintBtn")?.addEventListener("click", () => openMaintPreview());
 $("pushAllowBtn")?.addEventListener("click", async () => {
   $("pushAllowBtn").disabled = true;
-  $("pushAllowBtn").textContent = "Bitte warten …";
   const r = await registerPush({ askIfNeeded: true, forceAsk: true });
   $("pushAllowBtn").disabled = false;
-  $("pushAllowBtn").textContent = "Benachrichtigungen erlauben";
-  if (r.ok) {
-    hidePushGate();
-    $("app").hidden = false;
-    await loadPublicNotices();
-    await loadPermissions();
-    await Promise.all([loadPersonal(), loadClass(), loadUnterlagen()]);
-    subscribeAll();
-    applyHashRoute();
-    updateAdminUI();
-    setMainView("personal");
-    toast("Benachrichtigungen aktiv.");
-  } else {
-    showPushGate(r.reason || "Noch nicht erlaubt.");
-  }
+  finishPushPrompt();
+  if (r.ok) toast("Benachrichtigungen aktiv.");
+  else if (r.perm === "denied") toast("Blockiert – in den Einstellungen später änderbar.");
 });
-$("pushRecheckBtn")?.addEventListener("click", async () => {
-  if (await ensurePushGate()) {
-    $("app").hidden = false;
-    await loadPublicNotices();
-    await loadPermissions();
-    await Promise.all([loadPersonal(), loadClass(), loadUnterlagen()]);
-    subscribeAll();
-    applyHashRoute();
-    updateAdminUI();
-    setMainView("personal");
-    toast("Push ist aktiv.");
-  }
+$("pushSkipBtn")?.addEventListener("click", () => {
+  finishPushPrompt();
 });
 function showAuth() {
   hideBanScreen();
@@ -901,13 +875,11 @@ function showAuth() {
 async function showApp(session) {
   user = session.user;
   $("auth").hidden = true;
+  $("app").hidden = false;
   $("acctName").textContent = toName(user.email);
   fillSubjectSelect();
   await loadExtraAdmins();
   if (await blockIfMaintenance()) return;
-  // Push ist Pflicht – App erst nach Erlaubnis
-  if (!(await ensurePushGate())) return;
-  $("app").hidden = false;
   await loadPublicNotices();
   await loadPermissions();
   await Promise.all([loadPersonal(), loadClass(), loadUnterlagen()]);
@@ -915,6 +887,7 @@ async function showApp(session) {
   applyHashRoute();
   updateAdminUI();
   setMainView("personal");
+  maybeAskPushOnce();
 }
 
 async function callPublicAuth(payload) {
