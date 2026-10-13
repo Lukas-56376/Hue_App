@@ -170,19 +170,37 @@ button { appearance: none; -webkit-appearance: none; cursor: pointer; }
   box-shadow: var(--shadow);
   margin: 0 0 20px;
   overflow: hidden;
+  border: 1px solid var(--rule);
 }
 .state-row {
-  display: flex;
+  display: flex !important;
+  flex-direction: row !important;
   justify-content: space-between;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 16px;
   padding: 13px 16px;
   border-bottom: 1px solid var(--rule);
   font-size: 14px;
+  line-height: 1.35;
 }
 .state-row:last-child { border-bottom: 0; }
-.state-row span { color: var(--ink-3); }
-.state-row strong { font-weight: 600; text-align: right; }
-.state-danger { color: var(--red); }
+.state-k {
+  color: var(--ink-3);
+  flex: 0 0 auto;
+  min-width: 7.5em;
+  font-weight: 500;
+}
+.state-v {
+  color: var(--ink);
+  font-weight: 600;
+  text-align: right;
+  flex: 1 1 auto;
+  word-break: break-word;
+}
+.state-danger { color: var(--red) !important; }
+.state-screen .state-wrap { padding: 8px 0; }
+.state-ban .state-title { color: var(--ink); }
+.state-maint .state-title { color: var(--ink); }
 .state-foot {
   margin-top: 18px;
   font-size: 12px;

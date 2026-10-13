@@ -23,17 +23,17 @@
       <svg width="56" height="56" viewBox="0 0 56 56" fill="none"><circle cx="28" cy="28" r="26" stroke="currentColor" stroke-width="2.5"/><path d="M16 16l24 24M40 16L16 40" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
     </div>
     <p class="state-eyebrow">Zugriff gesperrt</p>
-    <h1 class="state-title">Du wurdest gebannt</h1>
-    <p class="state-sub">Dieses Netzwerk oder Gerät darf die Hausübungen-App derzeit nicht nutzen. Bei einem Fehler wende dich an DaWeed oder Nico.</p>
+    <h1 class="state-title" id="banTitle">Du wurdest gebannt</h1>
+    <p class="state-sub" id="banSub">Dieses Netzwerk oder Gerät darf die Hausübungen-App derzeit nicht nutzen. Bei einem Fehler wende dich an DaWeed oder Nico.</p>
     <div class="state-card">
-      <div class="state-row"><span>Grund</span><strong id="banReason">—</strong></div>
-      <div class="state-row"><span>Gebannt am</span><strong id="banWhen">—</strong></div>
-      <div class="state-row"><span>Ablauf</span><strong class="state-danger">Dauerhaft</strong></div>
-      <div class="state-row"><span>IP</span><strong id="banIpShow">—</strong></div>
-      <div class="state-row"><span>Durch</span><strong>Administrator</strong></div>
+      <div class="state-row"><span class="state-k">Grund</span><span class="state-v" id="banReason">—</span></div>
+      <div class="state-row"><span class="state-k">Gebannt am</span><span class="state-v" id="banWhen">—</span></div>
+      <div class="state-row"><span class="state-k">Ablauf</span><span class="state-v state-danger">Dauerhaft</span></div>
+      <div class="state-row"><span class="state-k">IP</span><span class="state-v" id="banIpShow">—</span></div>
+      <div class="state-row"><span class="state-k">Durch</span><span class="state-v">Administrator</span></div>
     </div>
     <button type="button" class="btn-primary" id="banRetry">Erneut prüfen</button>
-    <p class="state-foot">Hausübungen </p>
+    <p class="state-foot">Hausübungen</p>
   </div>
 </section>
 
@@ -46,7 +46,7 @@
     <h1 class="state-title">Wartungsarbeiten</h1>
     <p class="state-sub" id="maintMessage">Die App wird gerade gewartet. Bitte versuche es später erneut. Admins sind nicht betroffen.</p>
     <button type="button" class="btn-primary" id="maintRetry">Erneut versuchen</button>
-    <p class="state-foot">Hausübungen </p>
+    <p class="state-foot">Hausübungen</p>
   </div>
 </section>
 
@@ -681,6 +681,8 @@ function showBanScreen(reason, ip) {
   if (!b) return;
   b.hidden = false;
   document.body.classList.add("state-lock");
+  if ($("banTitle")) $("banTitle").textContent = "Du wurdest gebannt";
+  if ($("banSub")) $("banSub").textContent = "Dieses Netzwerk oder Gerät darf die Hausübungen-App derzeit nicht nutzen. Bei einem Fehler wende dich an DaWeed oder Nico.";
   if ($("banReason")) $("banReason").textContent = reason || "Verstoß gegen die Server-Regeln";
   if ($("banIpShow")) $("banIpShow").textContent = ip || "—";
   if ($("banWhen")) $("banWhen").textContent = new Date().toLocaleString("de-AT", { dateStyle: "medium", timeStyle: "short" });
