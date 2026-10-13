@@ -679,3 +679,20 @@ textarea { resize: vertical; min-height: 72px; }
 }
 
 body.banned { overflow: hidden; }
+
+.global-banner {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, #f59e0b 18%, transparent);
+  border: 1px solid color-mix(in srgb, #f59e0b 45%, var(--rule));
+  font-size: 14px;
+}
+.broadcast-feed { display: grid; gap: 8px; margin: 0 0 12px; }
+.broadcast-item {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--rule);
+  background: var(--soft);
+  font-size: 14px;
+}

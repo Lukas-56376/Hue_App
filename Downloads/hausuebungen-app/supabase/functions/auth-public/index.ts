@@ -290,7 +290,7 @@ Deno.serve(async req => {
       return json({ banned: !!banned.data, reason: banned.data?.reason || null, ip: ip || null });
     }
 
-    if (action === "list_ip_logs" || action === "list_ip_bans" || action === "list_devices" || action === "ban_ip" || action === "unban_ip") {
+    if (action === "list_ip_logs" || action === "list_ip_bans" || action === "ban_ip" || action === "unban_ip") {
       const auth = req.headers.get("Authorization");
       if (!auth) return json({ error: "Unauthorized" }, 401);
       const token = auth.replace(/^Bearer\s+/i, "");
@@ -298,26 +298,9 @@ Deno.serve(async req => {
       if (userError || !user || !isAdminEmail(user.email || "")) return json({ error: "Forbidden" }, 403);
 
       if (action === "list_ip_logs") {
-        const { data, error } = await admin.from("ip_logs").select("*").not("action", "in", "(visit,logout)").order("created_at", { ascending: false }).limit(100);
+        const { data, error } = await admin.from("ip_logs").select("*").order("created_at", { ascending: false }).limit(100);
         if (error) throw error;
         return json({ logs: data || [] });
-      }
-      if (action === "list_devices") {
-        // Alle Geräte (IP + Browser), jeweils mit dem letzten bekannten Status
-        const { data, error } = await admin.from("ip_logs")
-          .select("ip,user_email,user_agent,action,created_at")
-          .in("action", ["visit", "login", "logout", "login_failed", "register"])
-          .order("created_at", { ascending: false })
-          .limit(3000);
-        if (error) throw error;
-        const seen = new Map<string, { ip: string; user_email: string | null; last_seen: string }>();
-        for (const r of data || []) {
-          const key = `${r.ip}||${r.user_agent || ""}`;
-          if (seen.has(key)) continue; // neuester Eintrag zuerst = aktueller Status
-          const loggedIn = (r.action === "visit" || r.action === "login") && !!r.user_email;
-          seen.set(key, { ip: r.ip, user_email: loggedIn ? r.user_email : null, last_seen: r.created_at });
-        }
-        return json({ devices: [...seen.values()] });
       }
       if (action === "list_ip_bans") {
         const { data, error } = await admin.from("ip_bans").select("*").order("created_at", { ascending: false }).limit(100);

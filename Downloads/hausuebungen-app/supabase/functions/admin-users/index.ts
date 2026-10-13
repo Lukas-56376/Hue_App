@@ -105,6 +105,22 @@ Deno.serve(async req => {
       return json({ ok: true });
     }
 
+    if (action === "kick_push") {
+      const name = normName(body.username || "");
+      const id = String(body.userId || "");
+      let targetId = id;
+      if (!targetId && name) {
+        const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+        const found = (data?.users || []).find(u => (u.email || "").toLowerCase() === `${name}@${DOMAIN}`);
+        if (!found) return json({ error: "User nicht gefunden." }, 404);
+        targetId = found.id;
+      }
+      if (!targetId) return json({ error: "User fehlt." }, 400);
+      const { error, count } = await admin.from("push_subscriptions").delete({ count: "exact" }).eq("user_id", targetId);
+      if (error) throw error;
+      return json({ ok: true, removed: count || 0 });
+    }
+
     return json({ error: "Unbekannte Aktion." }, 400);
   } catch (e) {
     return json({ error: String((e as Error)?.message || e) }, 500);

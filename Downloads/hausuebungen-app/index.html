@@ -99,6 +99,8 @@
       </div>
     </header>
 
+    <div id="globalBanner" class="global-banner" hidden></div>
+
     <div class="progress-wrap" id="progressWrap">
       <div class="progress-label"><span id="progressText">–</span><span id="progressPct"></span></div>
       <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
@@ -133,6 +135,7 @@
         <div><h2>Klassen HÜ</h2><p>Gemeinsame Hausübungen für die Klasse.</p></div>
       </div>
       <div class="permission-note" id="classPermissionNote" hidden></div>
+      <div id="broadcastFeed" class="broadcast-feed"></div>
       <div class="class-list" id="classList"></div>
       <div class="empty" id="classEmpty" hidden></div>
     </section>
@@ -162,6 +165,7 @@
       <div class="admin-card">
         <h3>Benutzer</h3>
         <p class="field-help">Anlegen, umbenennen, Passwort ändern oder löschen. Speichert in Supabase Auth.</p>
+        <input type="search" id="userSearch" placeholder="Benutzer suchen …" autocomplete="off" style="margin:8px 0 10px;width:100%">
         <div id="userAdminList" class="permission-list"></div>
         <div class="user-add" style="margin-top:14px;display:grid;gap:8px">
           <input type="text" id="newUserName" placeholder="neuer Benutzername" autocapitalize="none" autocomplete="off">
@@ -181,9 +185,6 @@
           </div>
         </div>
         <div id="ipBanList" class="permission-list" style="margin-top:10px"></div>
-        <h4 style="margin:14px 0 6px;font-size:14px">Alle Geräte</h4>
-        <p class="field-help">IP Adresse | Eingeloggt als</p>
-        <div id="ipDeviceList" class="permission-list"></div>
         <h4 style="margin:14px 0 6px;font-size:14px">Letzte Zugriffe</h4>
         <div id="ipLogList" class="permission-list"></div>
         <button type="button" class="small-btn" id="refreshIpLog" style="margin-top:8px">Aktualisieren</button>
@@ -197,6 +198,10 @@
       <div class="admin-card">
         <h3>Klassen-HÜ- &amp; SÜ-Schreibrechte</h3>
         <div id="permissionList" class="permission-list"></div>
+        <div class="class-actions" style="margin-top:12px">
+          <button type="button" class="small-btn" id="writeAllOn">Allen Schreiben erlauben</button>
+          <button type="button" class="small-btn" id="writeAllOff">Allen entziehen (außer Admins)</button>
+        </div>
       </div>
       <div class="admin-card">
         <h3>Benachrichtigungen testen</h3>
@@ -212,7 +217,110 @@
       </div>
       <div class="admin-card">
         <h3>Aktivitäts-Log</h3>
+        <div class="class-actions" style="margin-bottom:8px">
+          <button type="button" class="small-btn" id="exportActivityBtn">Aktivität als CSV</button>
+          <button type="button" class="small-btn" id="exportUsersBtn">Benutzer als CSV</button>
+        </div>
         <div id="activityList"></div>
+      </div>
+
+      <div class="admin-card">
+        <h3>Admins & Rechte</h3>
+        <p class="field-help">Gleicher Admin-Rang. Fest eingetragene Admins (Config) bleiben. Weitere kannst du hinzufügen oder entziehen.</p>
+        <div id="roleAdminList" class="permission-list"></div>
+        <div class="user-add" style="margin-top:14px;display:grid;gap:8px">
+          <input type="text" id="newAdminName" placeholder="Benutzername (wird Admin)" autocapitalize="none" autocomplete="off">
+          <button type="button" class="small-btn" id="addAdminBtn">Als Admin hinzufügen</button>
+        </div>
+        <p class="field-help" id="roleAdminMsg" style="margin-top:8px"></p>
+      </div>
+
+      <div class="admin-card">
+        <h3>Wartungsmodus</h3>
+        <p class="field-help">Sperrt die App für alle, die kein Admin sind.</p>
+        <div class="check-row"><input type="checkbox" id="maintToggle"><label for="maintToggle" style="margin:0">Wartungsmodus aktiv</label></div>
+        <button type="button" class="small-btn" id="maintSaveBtn" style="margin-top:8px">Speichern</button>
+        <p class="field-help" id="maintMsg" style="margin-top:8px"></p>
+      </div>
+
+      <div class="admin-card">
+        <h3>Banner für alle</h3>
+        <p class="field-help">Hinweis oben in der App, ohne Push. Leer lassen = aus.</p>
+        <textarea id="bannerText" rows="2" placeholder="z. B. Test morgen in D"></textarea>
+        <button type="button" class="small-btn" id="bannerSaveBtn" style="margin-top:8px">Banner speichern</button>
+      </div>
+
+      <div class="admin-card">
+        <h3>Ankündigung</h3>
+        <p class="field-help">Sofortiger Push an alle Geräte mit Abo.</p>
+        <div class="field"><label for="announceTitle">Titel</label><input type="text" id="announceTitle" placeholder="Ankündigung"></div>
+        <div class="field"><label for="announceBody">Text</label><textarea id="announceBody" rows="2" placeholder="Nachricht …"></textarea></div>
+        <button type="button" class="small-btn" id="announceSendBtn">Jetzt an alle senden</button>
+        <p class="field-help" id="announceMsg" style="margin-top:8px"></p>
+        <hr style="border:0;border-top:1px solid var(--rule);margin:14px 0">
+        <p class="field-help">Geplant: wird beim nächsten Erinnerungs-Lauf (und wenn ein Admin die App öffnet) gesendet.</p>
+        <div class="field"><label for="schedAt">Senden am</label><input type="datetime-local" id="schedAt"></div>
+        <button type="button" class="small-btn" id="schedSaveBtn">Planen</button>
+        <div id="schedList" class="permission-list" style="margin-top:10px"></div>
+      </div>
+
+      <div class="admin-card">
+        <h3>Klassen-Broadcast</h3>
+        <p class="field-help">Nur in der App (Klassen-HÜ oben), kein Push.</p>
+        <textarea id="broadcastBody" rows="2" placeholder="Kurze Nachricht an die Klasse"></textarea>
+        <button type="button" class="small-btn" id="broadcastSendBtn" style="margin-top:8px">In der App posten</button>
+        <div id="broadcastAdminList" class="permission-list" style="margin-top:10px"></div>
+      </div>
+
+      <div class="admin-card">
+        <h3>Live-Übersicht</h3>
+        <p class="field-help">IP Adresse | Eingeloggt als | zuletzt gesehen</p>
+        <div id="liveList" class="permission-list"></div>
+        <button type="button" class="small-btn" id="refreshLive" style="margin-top:8px">Aktualisieren</button>
+      </div>
+
+      <div class="admin-card">
+        <h3>Offene HÜ</h3>
+        <div id="huStats" class="field-help">Lade …</div>
+      </div>
+
+      <div class="admin-card">
+        <h3>Klassen-HÜ moderieren</h3>
+        <p class="field-help">Letzte Einträge direkt löschen.</p>
+        <div id="modList" class="permission-list"></div>
+      </div>
+
+      <div class="admin-card">
+        <h3>Gemeldete Inhalte</h3>
+        <div id="reportList" class="permission-list"></div>
+      </div>
+
+      <div class="admin-card">
+        <h3>Login-Fehler</h3>
+        <p class="field-help">Häufungen aus den letzten Zugriffen.</p>
+        <div id="failList" class="permission-list"></div>
+      </div>
+
+      <div class="admin-card">
+        <h3>Geräte / Notfall-Logout</h3>
+        <p class="field-help" id="sessionHint">Push-Geräte werden geladen …</p>
+        <div class="user-add" style="display:grid;gap:8px">
+          <input type="text" id="kickUserName" placeholder="Benutzername" autocapitalize="none">
+          <button type="button" class="small-btn" id="kickUserBtn">Push-Geräte dieses Users löschen</button>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <h3>System & Erinnerungen</h3>
+        <p class="field-help" id="systemStatus">Status wird geladen …</p>
+        <p class="field-help" id="cronStatus"></p>
+        <button type="button" class="small-btn" id="pingStatusBtn">Status prüfen</button>
+      </div>
+
+      <div class="admin-card">
+        <h3>Backup</h3>
+        <p class="field-help" id="backupNote">Supabase Dashboard → Database → Backups. Regelmäßig prüfen.</p>
+        <p class="field-help"><a href="https://supabase.com/dashboard/project/pfyyhsxsmlsfepbjahyr/database/backups" target="_blank" rel="noopener">Backups im Dashboard öffnen</a></p>
       </div>
     </section>
   </div>
@@ -326,7 +434,11 @@ const ALLOWED = (cfg.USERS || []).map(x => String(x).toLowerCase());
 const toEmail = u => u.toLowerCase() + "@" + cfg.EMAIL_DOMAIN;
 const toName = e => (e || "").split("@")[0];
 const ADMIN_EMAILS = (cfg.ADMIN_EMAILS || [cfg.ADMIN_EMAIL || ""]).map(x => String(x || "").toLowerCase()).filter(Boolean);
-const isAdminEmail = e => ADMIN_EMAILS.includes((e || "").toLowerCase());
+let extraAdmins = new Set();
+const isAdminEmail = e => {
+  const x = (e || "").toLowerCase();
+  return ADMIN_EMAILS.includes(x) || extraAdmins.has(x);
+};
 const MAX_BYTES = cfg.MAX_UPLOAD_BYTES || 10 * 1024 * 1024 * 1024;
 const SUBJECTS = ["GGP","PH","SEW","RISL","RK","RE","Ethic","NWT","D","SOPK","AM","MEDT","GETE","E","GINF","ITSI"];
 
@@ -468,7 +580,7 @@ function setMainView(next, opts = {}) {
   if (next === "unterlagen") loadUnterlagen();
   if (next === "admin") {
     if (!isAdmin()) { setMainView("personal"); return; }
-    loadAdminUsers(); loadUserAdmin(); loadActivity(); refreshPushStatus(); loadResetCodes(); loadIpAdmin();
+    loadAdminUsers(); loadUserAdmin(); loadActivity(); refreshPushStatus(); loadResetCodes(); loadIpAdmin(); loadAdminHub();
   }
   if (next === "week") renderWeek();
   if (next === "widget") renderWidget();
@@ -587,6 +699,9 @@ async function showApp(session) {
   $("auth").hidden = true; $("app").hidden = false;
   $("acctName").textContent = toName(user.email);
   fillSubjectSelect();
+  await loadExtraAdmins();
+  await loadPublicNotices();
+  if (await blockIfMaintenance()) return;
   await loadPermissions();
   await Promise.all([loadPersonal(), loadClass(), loadUnterlagen()]);
   subscribeAll();
@@ -756,7 +871,7 @@ async function doLogin() {
 $("aGo").addEventListener("click", doLogin);
 $("aUser").addEventListener("keydown", e => { if (e.key === "Enter") $("aPass").focus(); });
 $("aPass").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
-$("logout").addEventListener("click", async () => { try { await callPublicAuth({ action: "log_session", event: "logout", detail: "logout" }); } catch {} await sb.auth.signOut(); user = null; items = []; classItems = []; showAuth(); });
+$("logout").addEventListener("click", async () => { await sb.auth.signOut(); user = null; items = []; classItems = []; showAuth(); });
 sb.auth.onAuthStateChange(async (_e, session) => {
   if (session && !user) {
     const banned = await checkIpBanOnStart();
@@ -1030,33 +1145,11 @@ async function ensureDefaultWrite() {
     // Trigger deckt neue User ab; für Alt-Accounts Admin-SQL.
   } catch {}
 }
-async function loadDeviceList() {
-  const devEl = $("ipDeviceList");
-  if (!devEl) return;
-  devEl.innerHTML = '<p class="field-help">Lade …</p>';
-  try {
-    const r = await callNotifyFunction("auth-public", { action: "list_devices" });
-    if (!r.ok) throw new Error(r.json?.error || "Geräte laden fehlgeschlagen");
-    const devices = r.json?.devices || [];
-    devEl.innerHTML = devices.length ? "" : '<p class="field-help">Noch keine Einträge.</p>';
-    for (const d of devices) {
-      const row = document.createElement("div");
-      row.className = "permission-row";
-      const when = new Date(d.last_seen).toLocaleString("de-AT", { dateStyle: "short", timeStyle: "short" });
-      const who = d.user_email ? toName(d.user_email) : "Gast";
-      row.innerHTML = `<span><code>${esc(d.ip)}</code> | ${esc(who)}<br><span class="field-help">${esc(when)}</span></span>`;
-      devEl.appendChild(row);
-    }
-  } catch (e) {
-    devEl.innerHTML = `<p class="field-help">${esc(e.message || e)}</p>`;
-  }
-}
 async function loadIpAdmin() {
   const bansEl = $("ipBanList");
   const logsEl = $("ipLogList");
   if (!bansEl || !logsEl) return;
   bansEl.innerHTML = logsEl.innerHTML = '<p class="field-help">Lade …</p>';
-  loadDeviceList();
   try {
     const [b, l] = await Promise.all([
       callNotifyFunction("auth-public", { action: "list_ip_bans" }),
@@ -1111,6 +1204,399 @@ $("banIpBtn")?.addEventListener("click", async () => {
   if (!r.ok) toast(r.json?.error || "Fehler");
   else { toast("IP gesperrt"); $("banIpInput").value = ""; $("banIpReason").value = ""; loadIpAdmin(); }
 });
+let cachedAdminUsers = [];
+function downloadCsv(name, rows) {
+  const escCsv = v => `"${String(v ?? "").replaceAll('"', '""')}"`;
+  const text = rows.map(r => r.map(escCsv).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + text], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+async function loadExtraAdmins() {
+  try {
+    const { data } = await sb.from("app_admins").select("email");
+    extraAdmins = new Set((data || []).map(r => (r.email || "").toLowerCase()));
+  } catch { extraAdmins = new Set(ADMIN_EMAILS); }
+}
+async function settingGet(key) {
+  const { data } = await sb.from("app_settings").select("value").eq("key", key).maybeSingle();
+  return data?.value ?? "";
+}
+async function settingSet(key, value) {
+  const { error } = await sb.from("app_settings").upsert({ key, value: String(value ?? ""), updated_at: new Date().toISOString() });
+  if (error) throw error;
+}
+function showBanner(text) {
+  const el = $("globalBanner");
+  if (!el) return;
+  const t = (text || "").trim();
+  el.hidden = !t;
+  el.textContent = t;
+}
+async function loadPublicNotices() {
+  try {
+    const banner = await settingGet("banner_text");
+    showBanner(banner);
+  } catch {}
+  await loadBroadcastFeed();
+  if (isAdmin()) {
+    try { await flushScheduledPushes(); } catch {}
+  }
+}
+async function blockIfMaintenance() {
+  let on = false;
+  try { on = (await settingGet("maintenance")) === "true"; } catch { return false; }
+  if (!on || isAdmin()) return false;
+  $("app").hidden = true;
+  $("auth").hidden = true;
+  if ($("banScreen")) {
+    $("banScreen").hidden = false;
+    if ($("banReason")) $("banReason").textContent = "Wartungsmodus – bitte später erneut versuchen.";
+    if ($("banIpShow")) $("banIpShow").textContent = "—";
+    const title = document.querySelector(".ban-title");
+    if (title) title.innerHTML = "Wartung";
+  }
+  return true;
+}
+async function loadBroadcastFeed() {
+  const el = $("broadcastFeed");
+  if (!el) return;
+  const { data, error } = await sb.from("app_broadcasts").select("body,created_by_name,created_at").order("created_at", { ascending: false }).limit(5);
+  if (error || !data?.length) { el.innerHTML = ""; return; }
+  el.innerHTML = data.map(b => `<div class="broadcast-item"><strong>${esc(b.created_by_name || "Admin")}</strong> · ${esc(new Date(b.created_at).toLocaleString("de-AT", { dateStyle: "short", timeStyle: "short" }))}<br>${esc(b.body)}</div>`).join("");
+}
+async function flushScheduledPushes() {
+  const { data } = await sb.from("scheduled_pushes").select("id,title,body,send_at").eq("sent", false).lte("send_at", new Date().toISOString());
+  for (const job of data || []) {
+    const r = await callNotifyFunction("send-class-notification", { title: job.title, body: job.body, tag: "scheduled-" + job.id });
+    if (r.ok) await sb.from("scheduled_pushes").update({ sent: true }).eq("id", job.id);
+  }
+}
+async function loadRoleAdmins() {
+  const list = $("roleAdminList");
+  if (!list) return;
+  list.innerHTML = "";
+  const fixed = new Set(ADMIN_EMAILS);
+  const emails = new Set([...ADMIN_EMAILS, ...extraAdmins]);
+  for (const email of [...emails].sort()) {
+    const row = document.createElement("div");
+    row.className = "permission-row";
+    const locked = fixed.has(email);
+    row.innerHTML = `<span>${esc(toName(email))}</span>`;
+    if (locked) {
+      const s = document.createElement("span");
+      s.className = "field-help";
+      s.textContent = "fest";
+      row.appendChild(s);
+    } else {
+      const btn = document.createElement("button");
+      btn.type = "button"; btn.className = "small-btn"; btn.textContent = "Entziehen";
+      btn.onclick = async () => {
+        const { error } = await sb.from("app_admins").delete().eq("email", email);
+        if (error) { toast(error.message); return; }
+        await loadExtraAdmins();
+        updateAdminUI();
+        loadRoleAdmins();
+        toast("Admin-Recht entfernt");
+      };
+      row.appendChild(btn);
+    }
+    list.appendChild(row);
+  }
+}
+async function loadSchedList() {
+  const el = $("schedList");
+  if (!el) return;
+  const { data, error } = await sb.from("scheduled_pushes").select("id,title,body,send_at,sent").order("send_at", { ascending: true }).limit(12);
+  if (error) { el.innerHTML = `<p class="field-help">${esc(error.message)}</p>`; return; }
+  if (!data?.length) { el.innerHTML = '<p class="field-help">Nichts geplant.</p>'; return; }
+  el.innerHTML = "";
+  for (const s of data) {
+    const row = document.createElement("div");
+    row.className = "permission-row";
+    const when = new Date(s.send_at).toLocaleString("de-AT", { dateStyle: "short", timeStyle: "short" });
+    row.innerHTML = `<span>${esc(s.title)} · ${esc(when)} ${s.sent ? "· gesendet" : ""}<br><span class="field-help">${esc(s.body)}</span></span>`;
+    if (!s.sent) {
+      const btn = document.createElement("button");
+      btn.type = "button"; btn.className = "small-btn"; btn.textContent = "Löschen";
+      btn.onclick = async () => { await sb.from("scheduled_pushes").delete().eq("id", s.id); loadSchedList(); };
+      row.appendChild(btn);
+    }
+    el.appendChild(row);
+  }
+}
+async function loadLive() {
+  const el = $("liveList");
+  if (!el) return;
+  el.innerHTML = '<p class="field-help">Lade …</p>';
+  try {
+    const r = await callNotifyFunction("auth-public", { action: "list_devices" });
+    if (!r.ok) throw new Error(r.json?.error || "Geräte nicht ladbar");
+    const devices = r.json?.devices || [];
+    if (!devices.length) { el.innerHTML = '<p class="field-help">Noch keine Geräte.</p>'; return; }
+    el.innerHTML = "";
+    for (const d of devices.slice(0, 30)) {
+      const who = d.user_email ? toName(d.user_email) : "Gast";
+      const when = d.last_seen ? new Date(d.last_seen).toLocaleString("de-AT", { dateStyle: "short", timeStyle: "short" }) : "";
+      const row = document.createElement("div");
+      row.className = "permission-row";
+      row.innerHTML = `<span><code>${esc(d.ip || "—")}</code> | ${esc(who)}<br><span class="field-help">${esc(when)}${d.banned ? " · gesperrt" : ""}</span></span>`;
+      el.appendChild(row);
+    }
+  } catch (e) { el.innerHTML = `<p class="field-help">${esc(e.message || e)}</p>`; }
+}
+function renderHuStats() {
+  const el = $("huStats");
+  if (!el) return;
+  const personalOpen = items.filter(i => !i.done);
+  const classOpen = classItems.filter(c => !classDone.has(c.id));
+  const by = {};
+  for (const i of [...personalOpen, ...classOpen]) {
+    const k = i.subject || "ohne Fach";
+    by[k] = (by[k] || 0) + 1;
+  }
+  const lines = Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k}: ${n}`).join(" · ");
+  el.textContent = `Persönlich offen: ${personalOpen.length} · Klassen offen: ${classOpen.length}${lines ? " · " + lines : ""}`;
+}
+async function loadModeration() {
+  const el = $("modList");
+  if (!el) return;
+  const rows = [...classItems].slice(0, 12);
+  if (!rows.length) { el.innerHTML = '<p class="field-help">Keine Klassen-HÜ.</p>'; return; }
+  el.innerHTML = "";
+  for (const it of rows) {
+    const row = document.createElement("div");
+    row.className = "permission-row";
+    row.innerHTML = `<span>${esc(it.subject || "–")}: ${esc(it.title)}</span>`;
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "small-btn"; btn.textContent = "Löschen";
+    btn.onclick = async () => {
+      if (!confirm("Klassen-HÜ löschen?")) return;
+      const { error } = await sb.from(CLASS_TABLE).delete().eq("id", it.id);
+      if (error) { toast(error.message); return; }
+      classItems = classItems.filter(c => c.id !== it.id);
+      renderClass();
+      loadModeration();
+      toast("Gelöscht.");
+    };
+    row.appendChild(btn);
+    el.appendChild(row);
+  }
+}
+async function loadReports() {
+  const el = $("reportList");
+  if (!el) return;
+  const { data, error } = await sb.from("content_reports").select("*").eq("status", "open").order("created_at", { ascending: false }).limit(30);
+  if (error) { el.innerHTML = `<p class="field-help">${esc(error.message)}</p>`; return; }
+  if (!data?.length) { el.innerHTML = '<p class="field-help">Keine offenen Meldungen.</p>'; return; }
+  el.innerHTML = "";
+  for (const r of data) {
+    const row = document.createElement("div");
+    row.className = "permission-row";
+    row.innerHTML = `<span>${esc(r.title || "HÜ")} · ${esc(r.reporter_name)}<br><span class="field-help">${esc(r.reason)}</span></span>`;
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "small-btn"; btn.textContent = "Erledigt";
+    btn.onclick = async () => {
+      await sb.from("content_reports").update({ status: "done" }).eq("id", r.id);
+      loadReports();
+    };
+    row.appendChild(btn);
+    el.appendChild(row);
+  }
+}
+async function loadFailMonitor() {
+  const el = $("failList");
+  if (!el) return;
+  try {
+    const r = await callNotifyFunction("auth-public", { action: "list_ip_logs" });
+    if (!r.ok) throw new Error(r.json?.error || "Logs nicht ladbar");
+    const counts = new Map();
+    for (const log of r.json?.logs || []) {
+      if (log.action !== "login_failed") continue;
+      const key = (log.ip || "?") + " | " + (log.user_email ? toName(log.user_email) : "Gast");
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    const rows = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    if (!rows.length) { el.innerHTML = '<p class="field-help">Keine fehlgeschlagenen Logins in den letzten Einträgen.</p>'; return; }
+    el.innerHTML = rows.slice(0, 15).map(([k, n]) => `<div class="permission-row"><span>${esc(k)}</span><span class="field-help">${n}×${n >= 5 ? " · auffällig" : ""}</span></div>`).join("");
+  } catch (e) { el.innerHTML = `<p class="field-help">${esc(e.message || e)}</p>`; }
+}
+async function loadSessionHint() {
+  const el = $("sessionHint");
+  if (!el) return;
+  const { count, error } = await sb.from("push_subscriptions").select("id", { count: "exact", head: true });
+  if (error) { el.textContent = "Push-Geräte: " + error.message; return; }
+  el.textContent = `${count || 0} Geräte mit Push-Abo (alle User). Auffällig ab sehr vielen Abos pro Person – dann Notfall-Logout nutzen.`;
+}
+async function pingSystem() {
+  const el = $("systemStatus");
+  const cron = $("cronStatus");
+  if (el) el.textContent = "Prüfe …";
+  const t0 = performance.now();
+  let authOk = false, pushOk = false;
+  try {
+    const r = await callPublicAuth({ action: "check_ban" });
+    authOk = r.ok || r.status === 200 || r.json?.banned === false || r.json?.banned === true || !!r.json;
+  } catch {}
+  try {
+    const res = await fetch(`${cfg.SUPABASE_URL}/functions/v1/send-class-notification`, { method: "OPTIONS" });
+    pushOk = res.ok || res.status === 204 || res.status === 200;
+  } catch {}
+  const ms = Math.round(performance.now() - t0);
+  if (el) el.textContent = `auth-public: ${authOk ? "ok" : "nicht erreichbar"} · Push-Function: ${pushOk ? "ok" : "unklar"} · ${ms} ms`;
+  try {
+    const at = await settingGet("last_reminder_at");
+    const sent = await settingGet("last_reminder_sent");
+    if (cron) cron.textContent = at
+      ? `Letzter Erinnerungs-Lauf: ${new Date(at).toLocaleString("de-AT")} · gesendet: ${sent || "0"}`
+      : "Noch kein Erinnerungs-Lauf protokolliert (Function daily-reminders neu deployen).";
+    const note = await settingGet("backup_note");
+    if (note && $("backupNote")) $("backupNote").textContent = note;
+  } catch {
+    if (cron) cron.textContent = "Cron-Status nicht lesbar (SQL admin-features.sql ausführen).";
+  }
+}
+async function massWrite(on) {
+  const names = [];
+  document.querySelectorAll("#permissionList .permission-row").forEach(row => {
+    const btn = row.querySelector(".toggle-btn");
+    if (!btn) return;
+    const email = btn.dataset.email;
+    const isOn = btn.classList.contains("on");
+    if (on === isOn) return;
+    names.push(email);
+  });
+  if (!names.length) { toast("Nichts zu ändern."); return; }
+  if (!confirm((on ? "Schreiben erlauben für " : "Schreibrecht entziehen bei ") + names.length + " Usern?")) return;
+  let ok = 0;
+  for (const email of names) {
+    const { error } = await sb.rpc("set_class_hu_permission", { p_email: email, p_can_write: on });
+    if (!error) ok++;
+  }
+  await loadPermissions();
+  await loadAdminUsers();
+  toast(`${ok} von ${names.length} aktualisiert.`);
+}
+async function loadAdminHub() {
+  await loadExtraAdmins();
+  await loadRoleAdmins();
+  try {
+    if ($("maintToggle")) $("maintToggle").checked = (await settingGet("maintenance")) === "true";
+    if ($("bannerText")) $("bannerText").value = await settingGet("banner_text");
+  } catch {}
+  loadSchedList();
+  loadLive();
+  renderHuStats();
+  loadModeration();
+  loadReports();
+  loadFailMonitor();
+  loadSessionHint();
+  pingSystem();
+  const { data } = await sb.from("app_broadcasts").select("id,body,created_by_name,created_at").order("created_at", { ascending: false }).limit(8);
+  const box = $("broadcastAdminList");
+  if (box) {
+    box.innerHTML = "";
+    for (const b of data || []) {
+      const row = document.createElement("div");
+      row.className = "permission-row";
+      row.innerHTML = `<span>${esc(b.body)}</span>`;
+      const btn = document.createElement("button");
+      btn.type = "button"; btn.className = "small-btn"; btn.textContent = "×";
+      btn.onclick = async () => { await sb.from("app_broadcasts").delete().eq("id", b.id); loadBroadcastFeed(); loadAdminHub(); };
+      row.appendChild(btn);
+      box.appendChild(row);
+    }
+    if (!(data || []).length) box.innerHTML = '<p class="field-help">Keine Broadcasts.</p>';
+  }
+}
+$("userSearch")?.addEventListener("input", () => {
+  const q = ($("userSearch").value || "").trim().toLowerCase();
+  document.querySelectorAll("#userAdminList .permission-row").forEach(row => {
+    row.hidden = q && !row.textContent.toLowerCase().includes(q);
+  });
+});
+$("addAdminBtn")?.addEventListener("click", async () => {
+  const name = ($("newAdminName")?.value || "").trim().toLowerCase().replace(/@.*$/, "");
+  if (!name) return;
+  const email = toEmail(name);
+  const { error } = await sb.from("app_admins").upsert({ email });
+  if ($("roleAdminMsg")) $("roleAdminMsg").textContent = error ? error.message : (name + " ist Admin.");
+  if (!error) { $("newAdminName").value = ""; await loadExtraAdmins(); updateAdminUI(); loadRoleAdmins(); await loadAdminUsers(); }
+});
+$("maintSaveBtn")?.addEventListener("click", async () => {
+  try {
+    await settingSet("maintenance", $("maintToggle").checked ? "true" : "false");
+    if ($("maintMsg")) $("maintMsg").textContent = $("maintToggle").checked ? "Wartung AN" : "Wartung AUS";
+  } catch (e) { if ($("maintMsg")) $("maintMsg").textContent = e.message; }
+});
+$("bannerSaveBtn")?.addEventListener("click", async () => {
+  try {
+    const text = $("bannerText").value.trim();
+    await settingSet("banner_text", text);
+    showBanner(text);
+    toast("Banner gespeichert.");
+  } catch (e) { toast(e.message); }
+});
+$("announceSendBtn")?.addEventListener("click", async () => {
+  const title = ($("announceTitle")?.value || "").trim() || "Ankündigung";
+  const body = ($("announceBody")?.value || "").trim();
+  if (!body) { toast("Text eingeben"); return; }
+  const r = await callNotifyFunction("send-class-notification", { title, body, tag: "announce" });
+  if ($("announceMsg")) $("announceMsg").textContent = r.ok ? "Gesendet." : (r.json?.error || "Fehler");
+});
+$("schedSaveBtn")?.addEventListener("click", async () => {
+  const title = ($("announceTitle")?.value || "").trim() || "Ankündigung";
+  const body = ($("announceBody")?.value || "").trim();
+  const at = $("schedAt")?.value;
+  if (!body || !at) { toast("Text und Zeitpunkt nötig."); return; }
+  const { error } = await sb.from("scheduled_pushes").insert({
+    title, body, send_at: new Date(at).toISOString(), created_by_name: toName(user.email)
+  });
+  toast(error ? error.message : "Geplant.");
+  loadSchedList();
+});
+$("broadcastSendBtn")?.addEventListener("click", async () => {
+  const body = ($("broadcastBody")?.value || "").trim();
+  if (!body) return;
+  const { error } = await sb.from("app_broadcasts").insert({
+    body, created_by: user.id, created_by_name: toName(user.email)
+  });
+  if (error) { toast(error.message); return; }
+  $("broadcastBody").value = "";
+  toast("Broadcast gepostet.");
+  await logActivity("broadcast", body.slice(0, 80));
+  loadBroadcastFeed();
+  loadAdminHub();
+});
+$("refreshLive")?.addEventListener("click", () => loadLive());
+$("writeAllOn")?.addEventListener("click", () => massWrite(true));
+$("writeAllOff")?.addEventListener("click", () => massWrite(false));
+$("exportUsersBtn")?.addEventListener("click", async () => {
+  try {
+    const data = await adminUsersApi({ action: "list" });
+    downloadCsv("benutzer.csv", [["name", "email", "admin"], ...(data.users || []).map(u => [u.name, u.email, isAdminEmail(u.email) ? "ja" : "nein"])]);
+  } catch (e) { toast(e.message); }
+});
+$("exportActivityBtn")?.addEventListener("click", async () => {
+  const { data, error } = await sb.from(LOG_TABLE).select("created_at,user_name,action,detail").order("created_at", { ascending: false }).limit(500);
+  if (error) { toast(error.message); return; }
+  downloadCsv("aktivitaet.csv", [["zeit", "user", "aktion", "detail"], ...(data || []).map(a => [a.created_at, a.user_name, a.action, a.detail || ""])]);
+});
+$("kickUserBtn")?.addEventListener("click", async () => {
+  const username = ($("kickUserName")?.value || "").trim();
+  if (!username) return;
+  if (!confirm("Alle Push-Geräte von " + username + " entfernen?")) return;
+  try {
+    const r = await adminUsersApi({ action: "kick_push", username });
+    toast("Entfernt: " + (r.removed ?? 0));
+    loadSessionHint();
+  } catch (e) { toast(e.message); }
+});
+$("pingStatusBtn")?.addEventListener("click", () => pingSystem());
+
 async function loadPermissions() {
   const { data, error } = await sb.from(PERM_TABLE).select("user_id,can_write,user_email");
   if (error) { console.warn(error); if (isAdmin()) toast("Berechtigungen konnten nicht geladen werden."); return; }
@@ -1752,6 +2238,7 @@ function renderClass() {
       <div class="class-actions">
         <button type="button" class="toggle-btn ${done ? "on" : ""}" data-toggle="${it.id}">${done ? "Erledigt ✓" : "Als erledigt markieren"}</button>
         ${(isAdmin() || it.created_by === user.id) ? `<button type="button" class="small-btn" data-edit="${it.id}">Bearbeiten</button>` : ""}
+        <button type="button" class="small-btn" data-report="${it.id}">Melden</button>
       </div>`;
     list.appendChild(card);
     loadExistingFiles(null, it.id, card.querySelector("[data-files]"));
@@ -1766,6 +2253,22 @@ function renderClass() {
     btn.onclick = () => {
       const it = classItems.find(c => c.id === btn.dataset.edit);
       if (it) openClassSheet(it);
+    };
+  });
+  list.querySelectorAll("[data-report]").forEach(btn => {
+    btn.onclick = async () => {
+      const it = classItems.find(c => c.id === btn.dataset.report);
+      if (!it) return;
+      const reason = prompt("Warum melden?", "Unpassend / falsch");
+      if (reason == null) return;
+      const { error } = await sb.from("content_reports").insert({
+        class_hu_id: it.id,
+        title: it.title,
+        reason: reason.trim() || "Gemeldet",
+        reporter_id: user.id,
+        reporter_name: toName(user.email)
+      });
+      toast(error ? ("Melden fehlgeschlagen: " + error.message) : "Gemeldet. Admins sehen das im Admin-Tab.");
     };
   });
   list.querySelectorAll(".sol-file-input").forEach(inp => {
@@ -2297,22 +2800,6 @@ $("nfHome")?.addEventListener("click", () => {
 
 $("today").textContent = new Date().toLocaleDateString("de-AT", { weekday: "long", day: "numeric", month: "long" });
 
-// Jeder Seitenaufruf wird mit IP protokolliert (mit Account, falls eingeloggt – sonst Gast)
-async function logVisit() {
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    await fetch(`${cfg.SUPABASE_URL}/functions/v1/auth-public`, {
-      method: "POST",
-      headers: {
-        apikey: cfg.SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${session?.access_token || cfg.SUPABASE_ANON_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ action: "log_session", event: "visit", detail: "page-open" })
-    });
-  } catch {}
-}
-
 // Ban hat Vorrang vor Login/Session → direkt Ban-Screen
 const bannedAtStart = await checkIpBanOnStart();
 if (bannedAtStart) {
@@ -2320,7 +2807,6 @@ if (bannedAtStart) {
   try { await sb.auth.signOut(); } catch {}
   user = null;
 } else {
-  logVisit();
   const { data: { session: first } } = await sb.auth.getSession();
   if (first) await showApp(first);
   else showAuth();

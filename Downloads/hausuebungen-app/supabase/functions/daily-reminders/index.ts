@@ -211,6 +211,32 @@ Deno.serve(async req => {
       }
     }
 
+    try {
+      const { data: due } = await supabase.from("scheduled_pushes")
+        .select("id,title,body").eq("sent", false).lte("send_at", new Date().toISOString());
+      for (const job of due || []) {
+        for (const sub of subs || []) {
+          try {
+            await webpush.sendNotification(sub.subscription, JSON.stringify({
+              title: job.title || "Ankündigung",
+              body: job.body,
+              tag: "scheduled-" + job.id,
+              url: "./#/"
+            }));
+            sent++;
+          } catch { /* Gerät einzeln ignorieren */ }
+        }
+        await supabase.from("scheduled_pushes").update({ sent: true }).eq("id", job.id);
+      }
+    } catch { /* Tabelle optional */ }
+
+    try {
+      await supabase.from("app_settings").upsert([
+        { key: "last_reminder_at", value: new Date().toISOString(), updated_at: new Date().toISOString() },
+        { key: "last_reminder_sent", value: String(sent), updated_at: new Date().toISOString() }
+      ]);
+    } catch { /* ignore */ }
+
     return json({ date: today, hour: now.hour, sent, force });
   } catch (e) {
     return json({ error: String(e) }, 500);
