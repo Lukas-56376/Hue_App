@@ -181,6 +181,9 @@
           </div>
         </div>
         <div id="ipBanList" class="permission-list" style="margin-top:10px"></div>
+        <h4 style="margin:14px 0 6px;font-size:14px">Alle Geräte</h4>
+        <p class="field-help">IP Adresse | Eingeloggt als</p>
+        <div id="ipDeviceList" class="permission-list"></div>
         <h4 style="margin:14px 0 6px;font-size:14px">Letzte Zugriffe</h4>
         <div id="ipLogList" class="permission-list"></div>
         <button type="button" class="small-btn" id="refreshIpLog" style="margin-top:8px">Aktualisieren</button>
@@ -753,7 +756,7 @@ async function doLogin() {
 $("aGo").addEventListener("click", doLogin);
 $("aUser").addEventListener("keydown", e => { if (e.key === "Enter") $("aPass").focus(); });
 $("aPass").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
-$("logout").addEventListener("click", async () => { await sb.auth.signOut(); user = null; items = []; classItems = []; showAuth(); });
+$("logout").addEventListener("click", async () => { try { await callPublicAuth({ action: "log_session", event: "logout", detail: "logout" }); } catch {} await sb.auth.signOut(); user = null; items = []; classItems = []; showAuth(); });
 sb.auth.onAuthStateChange(async (_e, session) => {
   if (session && !user) {
     const banned = await checkIpBanOnStart();
@@ -1027,11 +1030,33 @@ async function ensureDefaultWrite() {
     // Trigger deckt neue User ab; für Alt-Accounts Admin-SQL.
   } catch {}
 }
+async function loadDeviceList() {
+  const devEl = $("ipDeviceList");
+  if (!devEl) return;
+  devEl.innerHTML = '<p class="field-help">Lade …</p>';
+  try {
+    const r = await callNotifyFunction("auth-public", { action: "list_devices" });
+    if (!r.ok) throw new Error(r.json?.error || "Geräte laden fehlgeschlagen");
+    const devices = r.json?.devices || [];
+    devEl.innerHTML = devices.length ? "" : '<p class="field-help">Noch keine Einträge.</p>';
+    for (const d of devices) {
+      const row = document.createElement("div");
+      row.className = "permission-row";
+      const when = new Date(d.last_seen).toLocaleString("de-AT", { dateStyle: "short", timeStyle: "short" });
+      const who = d.user_email ? toName(d.user_email) : "Gast";
+      row.innerHTML = `<span><code>${esc(d.ip)}</code> | ${esc(who)}<br><span class="field-help">${esc(when)}</span></span>`;
+      devEl.appendChild(row);
+    }
+  } catch (e) {
+    devEl.innerHTML = `<p class="field-help">${esc(e.message || e)}</p>`;
+  }
+}
 async function loadIpAdmin() {
   const bansEl = $("ipBanList");
   const logsEl = $("ipLogList");
   if (!bansEl || !logsEl) return;
   bansEl.innerHTML = logsEl.innerHTML = '<p class="field-help">Lade …</p>';
+  loadDeviceList();
   try {
     const [b, l] = await Promise.all([
       callNotifyFunction("auth-public", { action: "list_ip_bans" }),
@@ -2272,6 +2297,22 @@ $("nfHome")?.addEventListener("click", () => {
 
 $("today").textContent = new Date().toLocaleDateString("de-AT", { weekday: "long", day: "numeric", month: "long" });
 
+// Jeder Seitenaufruf wird mit IP protokolliert (mit Account, falls eingeloggt – sonst Gast)
+async function logVisit() {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    await fetch(`${cfg.SUPABASE_URL}/functions/v1/auth-public`, {
+      method: "POST",
+      headers: {
+        apikey: cfg.SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${session?.access_token || cfg.SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ action: "log_session", event: "visit", detail: "page-open" })
+    });
+  } catch {}
+}
+
 // Ban hat Vorrang vor Login/Session → direkt Ban-Screen
 const bannedAtStart = await checkIpBanOnStart();
 if (bannedAtStart) {
@@ -2279,6 +2320,7 @@ if (bannedAtStart) {
   try { await sb.auth.signOut(); } catch {}
   user = null;
 } else {
+  logVisit();
   const { data: { session: first } } = await sb.auth.getSession();
   if (first) await showApp(first);
   else showAuth();
