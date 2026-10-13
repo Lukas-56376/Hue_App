@@ -1,96 +1,2288 @@
--- ============================================================
--- Standard: Schreibrecht für neue User
--- + IP-Logs / IP-Bans (Admin)
--- ============================================================
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Hausübungen</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Persönliche und Klassen-Hausübungen.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Hausübungen">
+<meta name="theme-color" content="#ffffff" id="themeColor">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.jpg">
+<link rel="icon" href="icon.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
 
--- Default-Schreibrecht beim Anlegen eines Auth-Users
-create or replace function public.grant_default_class_write()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  insert into public.klassen_hu_permissions (user_id, user_email, can_write)
-  values (new.id, lower(coalesce(new.email, '')), true)
-  on conflict (user_id) do update
-    set user_email = excluded.user_email
-    -- can_write bei Konflikt NICHT überschreiben (Admin-Entzug bleibt)
-    ;
-  return new;
-end;
-$$;
+<section id="banScreen" hidden>
+  <div class="ban-wrap">
+    <div class="ban-badge"><span class="ban-dot"></span> Zugriff gesperrt</div>
+    <div class="ban-icon" aria-hidden="true">⊘</div>
+    <h1 class="ban-title">Du wurdest <span>gebannt</span></h1>
+    <p class="ban-sub">Der Zugriff auf die Hausübungen-App ist für dieses Netzwerk vorübergehend oder dauerhaft gesperrt.<br>
+      Falls das ein Fehler ist, wende dich an einen Admin (DaWeed / Nico).</p>
+    <div class="ban-card">
+      <div class="ban-row"><span class="ban-k">⚠ Grund</span><span class="ban-v" id="banReason">—</span></div>
+      <div class="ban-row"><span class="ban-k">▣ Gebannt am</span><span class="ban-v" id="banWhen">—</span></div>
+      <div class="ban-row"><span class="ban-k">⏱ Ablauf</span><span class="ban-v ban-permanent">Dauerhaft</span></div>
+      <div class="ban-row"><span class="ban-k">◇ IP</span><span class="ban-v" id="banIpShow">—</span></div>
+      <div class="ban-row"><span class="ban-k">◎ Gebannt durch</span><span class="ban-v">Administrator</span></div>
+    </div>
+    <button type="button" class="ban-back" id="banRetry">← Erneut prüfen</button>
+    <p class="ban-foot">— Danke für dein Verständnis. —</p>
+  </div>
+</section>
 
-drop trigger if exists on_auth_user_grant_write on auth.users;
-create trigger on_auth_user_grant_write
-  after insert on auth.users
-  for each row execute function public.grant_default_class_write();
+<section id="notFoundScreen" hidden>
+  <div class="nf-wrap">
+    <p class="nf-code">404</p>
+    <h1 class="nf-title">Seite nicht gefunden</h1>
+    <p class="nf-sub">Diese Adresse gibt es hier nicht.<br>
+      Gültig z. B. <code>#/</code>, <code>#/klassen-hu</code>, <code>#/unterlagen</code>, <code>#/woche</code>.</p>
+    <button type="button" class="ban-back" id="nfHome">← Zur Startseite</button>
+  </div>
+</section>
 
--- Bestehende User ohne Eintrag: Schreibrecht setzen
-insert into public.klassen_hu_permissions (user_id, user_email, can_write)
-select u.id, lower(u.email), true
-from auth.users u
-where u.email is not null
-  and not exists (
-    select 1 from public.klassen_hu_permissions p where p.user_id = u.id
-  )
-on conflict (user_id) do nothing;
+<section id="auth" hidden>
+  <h1>Hausübungen</h1>
+  <p class="sub" id="authSub">Melde dich an – funktioniert auf mehreren Geräten und über VPN/WLAN.</p>
 
--- IP-Logs
-create table if not exists public.ip_logs (
-  id uuid primary key default gen_random_uuid(),
-  ip text not null,
-  action text not null default 'login',
-  user_id uuid references auth.users(id) on delete set null,
-  user_email text,
-  user_agent text,
-  detail text,
-  created_at timestamptz not null default now()
-);
-create index if not exists ip_logs_ip_idx on public.ip_logs(ip);
-create index if not exists ip_logs_created_idx on public.ip_logs(created_at desc);
+  <div id="authLogin">
+    <div class="field"><label for="aUser">Benutzername</label><input type="text" id="aUser" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="dein Benutzername"></div>
+    <div class="field"><label for="aPass">Passwort</label><input type="password" id="aPass" autocomplete="current-password" placeholder="dein Passwort"></div>
+    <p class="err" id="aErr"></p>
+    <div class="actions auth-actions"><button class="save" id="aGo" type="button">Anmelden</button></div>
+    <p class="foot"><button type="button" class="linkish" id="goRegister">Account erstellen</button> · <button type="button" class="linkish" id="goReset">Passwort vergessen</button></p>
+  </div>
 
--- IP-Bans
-create table if not exists public.ip_bans (
-  id uuid primary key default gen_random_uuid(),
-  ip text not null unique,
-  reason text not null default '',
-  active boolean not null default true,
-  banned_by text,
-  created_at timestamptz not null default now()
-);
-create index if not exists ip_bans_active_idx on public.ip_bans(ip) where active = true;
+  <div id="authRegister" hidden>
+    <div class="field"><label for="rUser">Benutzername</label><input type="text" id="rUser" autocapitalize="none" autocomplete="username" placeholder="z. B. max"></div>
+    <div class="field"><label for="rPass">Passwort</label><input type="password" id="rPass" autocomplete="new-password" placeholder="min. 6 Zeichen"></div>
+    <div class="field"><label for="rPass2">Passwort wiederholen</label><input type="password" id="rPass2" autocomplete="new-password" placeholder="nochmal"></div>
+    <p class="err" id="rErr"></p>
+    <div class="actions auth-actions"><button class="save" id="rGo" type="button">Registrieren</button></div>
+    <p class="foot"><button type="button" class="linkish" id="backLogin1">Zur Anmeldung</button></p>
+  </div>
 
-alter table public.ip_logs enable row level security;
-alter table public.ip_bans enable row level security;
+  <div id="authReset" hidden>
+    <div class="field"><label for="xUser">Benutzername</label><input type="text" id="xUser" autocapitalize="none" autocomplete="username" placeholder="dein Benutzername"></div>
+    <p class="field-help">Ein Code wird an den Admin geschickt (Push). Den Code bekommst du vom Admin.</p>
+    <p class="err" id="xErr"></p>
+    <div class="actions auth-actions"><button class="save" id="xRequest" type="button">Code anfordern</button></div>
+    <div class="field" style="margin-top:14px"><label for="xCode">Code vom Admin</label><input type="text" id="xCode" inputmode="numeric" autocomplete="one-time-code" placeholder="6-stelliger Code"></div>
+    <div class="field"><label for="xPass">Neues Passwort</label><input type="password" id="xPass" autocomplete="new-password" placeholder="min. 6 Zeichen"></div>
+    <div class="field"><label for="xPass2">Passwort wiederholen</label><input type="password" id="xPass2" autocomplete="new-password" placeholder="nochmal"></div>
+    <div class="actions auth-actions"><button class="save" id="xConfirm" type="button">Passwort setzen</button></div>
+    <p class="foot"><button type="button" class="linkish" id="backLogin2">Zur Anmeldung</button></p>
+  </div>
+</section>
 
-drop policy if exists "ip_logs_admin" on public.ip_logs;
-drop policy if exists "ip_bans_admin_select" on public.ip_bans;
-drop policy if exists "ip_bans_admin_all" on public.ip_bans;
+<div id="app" hidden>
+  <div class="wrap">
+    <header>
+      <div class="head-main">
+        <p class="today" id="today"></p>
+        <h1 class="page">Hausübungen</h1>
+        <p class="tally"><span class="mark" id="openCount">…</span></p>
+      </div>
+      <div class="acct">
+        <button type="button" class="theme-btn" id="settingsBtn" aria-label="Einstellungen" title="Einstellungen">⚙</button>
+          <button type="button" class="theme-btn" id="themeBtn" aria-label="Dark/Light Mode" title="Design wechseln">◐</button>
+        <span class="nm" id="acctName"></span>
+        <button class="out" id="logout" type="button">Abmelden</button>
+      </div>
+    </header>
 
--- Nur Admins lesen Logs/Bans über Client; Writes über Service Role (Edge)
-create policy "ip_logs_admin" on public.ip_logs
-  for select to authenticated using (public.is_hu_admin());
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-label"><span id="progressText">–</span><span id="progressPct"></span></div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
 
-create policy "ip_bans_admin_select" on public.ip_bans
-  for select to authenticated using (public.is_hu_admin());
+    <nav class="main-tabs" role="tablist" aria-label="Bereich">
+      <button role="tab" aria-selected="true" data-view="personal">Persönlich</button>
+      <button role="tab" aria-selected="false" data-view="class">Klassen HÜ</button>
+      <button role="tab" aria-selected="false" data-view="unterlagen">Unterlagen</button>
+      <button role="tab" aria-selected="false" data-view="week">Diese Woche</button>
+      <button role="tab" aria-selected="false" data-view="admin" id="adminTab" hidden>Admin</button>
+    </nav>
 
-create policy "ip_bans_admin_all" on public.ip_bans
-  for all to authenticated
-  using (public.is_hu_admin())
-  with check (public.is_hu_admin());
+    <section id="personalView">
+      <nav class="filters" role="tablist" aria-label="Persönliche Ansicht">
+        <button role="tab" aria-selected="true" data-filter="open">Offen</button>
+        <button role="tab" aria-selected="false" data-filter="done">Erledigt</button>
+        <button role="tab" aria-selected="false" data-filter="tomorrow" id="tomorrowTab">Morgen</button>
+        <button role="tab" aria-selected="false" data-filter="all">Alle</button>
+      </nav>
+      <div class="adv-filters" id="advFilters">
+        <select id="filterSubject" aria-label="Fach filtern"><option value="">Alle Fächer</option></select>
+        <input type="date" id="filterDue" aria-label="Fällig am" title="Fällig am">
+        <label><input type="checkbox" id="filterImportant"> Nur wichtig</label>
+      </div>
+      <ul id="list"><li class="skeleton"></li><li class="skeleton"></li><li class="skeleton"></li></ul>
+      <div class="empty" id="empty" hidden></div>
+    </section>
 
--- Helper: IP gebannt?
-create or replace function public.is_ip_banned(p_ip text)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select exists (
-    select 1 from public.ip_bans b
-    where b.active = true
-      and b.ip = nullif(trim(p_ip), '')
-  );
-$$;
+    <section id="classView" hidden>
+      <div class="section-head">
+        <div><h2>Klassen HÜ</h2><p>Gemeinsame Hausübungen für die Klasse.</p></div>
+      </div>
+      <div class="permission-note" id="classPermissionNote" hidden></div>
+      <div class="class-list" id="classList"></div>
+      <div class="empty" id="classEmpty" hidden></div>
+    </section>
+
+    <section id="unterlagenView" hidden>
+      <div class="section-head">
+        <div><h2>Unterlagen</h2><p>Schulübungen und Material aus dem Unterricht.</p></div>
+      </div>
+      <div class="permission-note" id="suPermissionNote" hidden></div>
+      <div class="class-list" id="suList"></div>
+      <div class="empty" id="suEmpty" hidden></div>
+    </section>
+
+    <section id="weekView" hidden>
+      <div class="section-head"><div><h2>Diese Woche</h2><p>Was du diese Woche noch zu erledigen hast.</p></div></div>
+      <div id="weekContent"></div>
+      <div class="empty" id="weekEmpty" hidden></div>
+    </section>
+
+    <section id="widgetView" hidden>
+        <div class="section-head"><div><h2>Widget</h2><p>Nächste offene Hausübungen.</p></div></div>
+        <div id="widgetList"></div>
+        <button type="button" class="small-btn" id="widgetBack" style="margin-top:12px">← Zurück</button>
+      </section>
+      <section id="adminView" hidden>
+      <div class="section-head"><div><h2>Admin</h2><p>Schreibrechte & Aktivität.</p></div></div>
+      <div class="admin-card">
+        <h3>Benutzer</h3>
+        <p class="field-help">Anlegen, umbenennen, Passwort ändern oder löschen. Speichert in Supabase Auth.</p>
+        <div id="userAdminList" class="permission-list"></div>
+        <div class="user-add" style="margin-top:14px;display:grid;gap:8px">
+          <input type="text" id="newUserName" placeholder="neuer Benutzername" autocapitalize="none" autocomplete="off">
+          <input type="text" id="newUserPass" placeholder="Passwort (min. 6 Zeichen)" autocomplete="off">
+          <button type="button" class="small-btn" id="addUserBtn">Benutzer anlegen</button>
+        </div>
+        <p class="field-help" id="userAdminMsg" style="margin-top:8px"></p>
+      </div>
+      <div class="admin-card">
+        <h3>IP-Log &amp; Bans</h3>
+        <p class="field-help">Anmeldungen und Registrierungen. Gebannte IPs können sich nicht registrieren und werden beim Login blockiert.</p>
+        <div class="field"><label>IP sperren</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input type="text" id="banIpInput" placeholder="z. B. 1.2.3.4" style="flex:1;min-width:120px">
+            <input type="text" id="banIpReason" placeholder="Grund (optional)" style="flex:1;min-width:120px">
+            <button type="button" class="small-btn" id="banIpBtn">Sperren</button>
+          </div>
+        </div>
+        <div id="ipBanList" class="permission-list" style="margin-top:10px"></div>
+        <h4 style="margin:14px 0 6px;font-size:14px">Letzte Zugriffe</h4>
+        <div id="ipLogList" class="permission-list"></div>
+        <button type="button" class="small-btn" id="refreshIpLog" style="margin-top:8px">Aktualisieren</button>
+      </div>
+      <div class="admin-card">
+        <h3>Passwort-Reset-Codes</h3>
+        <p class="field-help">Codes, die User angefordert haben (auch per Push an dich).</p>
+        <div id="resetCodeList" class="permission-list"></div>
+        <button type="button" class="small-btn" id="refreshResetCodes" style="margin-top:8px">Aktualisieren</button>
+      </div>
+      <div class="admin-card">
+        <h3>Klassen-HÜ- &amp; SÜ-Schreibrechte</h3>
+        <div id="permissionList" class="permission-list"></div>
+      </div>
+      <div class="admin-card">
+        <h3>Benachrichtigungen testen</h3>
+        <p class="field-help" id="pushStatus">Status wird geladen …</p>
+        <div class="class-actions" style="margin-top:12px">
+          <button type="button" class="small-btn" id="testLocalPush">Lokale Test-Nachricht</button>
+          <button type="button" class="small-btn" id="testRemotePush">Push an alle Geräte</button>
+          <button type="button" class="small-btn" id="testDailyPush">Erinnerung „1 Tag vorher“ jetzt senden</button>
+          <button type="button" class="small-btn" id="testArchiveClass">Klassen-HÜ → Persönlich (heute 23:59 testen)</button>
+          <button type="button" class="small-btn" id="refreshPushStatus">Status neu laden</button>
+        </div>
+        <p class="field-help" id="pushTestResult" style="margin-top:10px"></p>
+      </div>
+      <div class="admin-card">
+        <h3>Aktivitäts-Log</h3>
+        <div id="activityList"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="bar" id="personalBar"><button id="addBtn" type="button">Neue Hausübung</button></div>
+  <div class="bar" id="classBar" hidden><button id="addClassBtn" type="button">Klassen-HÜ hinzufügen</button></div>
+  <div class="bar" id="suBar" hidden><button id="addSuBtn" type="button">Schulübung hinzufügen</button></div>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<section class="sheet" id="sheet" hidden aria-modal="true" role="dialog" aria-labelledby="sheetTitle">
+  <div class="grip"></div>
+  <h2 id="sheetTitle">Neue Hausübung</h2>
+  <div class="field"><label for="fTitle">Aufgabe</label><input type="text" id="fTitle" placeholder="z. B. Seite 42, Nr. 3–7" autocomplete="off"></div>
+  <div class="field"><label for="fSubject">Fach</label><input type="text" id="fSubject" placeholder="Fach wählen oder tippen" autocomplete="off"><div class="chips" id="chips"></div></div>
+  <div class="field"><label for="fDue">Fällig am</label><input type="date" id="fDue"></div>
+  <div class="field"><label for="fNote">Notiz</label><textarea id="fNote" placeholder="Optional – Details, Abgabeform, Material …"></textarea></div>
+  <div class="check-row"><input type="checkbox" id="fImportant"><label for="fImportant" style="margin:0">Wichtig (rote Markierung)</label></div>
+  <div class="field"><label for="fFiles">Dateien</label><input type="file" id="fFiles" multiple accept="*/*"><p class="field-help">Mehrere Dateien möglich. Max. 10 GB. Vorschau für PDF, Bilder, Text.</p><div id="fileQueue" class="file-queue"></div><div id="existingFiles" class="attachments"></div></div>
+  <div class="actions"><button class="cancel" id="cancelBtn" type="button">Zurück</button><button class="del" id="delBtn" type="button" hidden>Löschen</button><button class="save" id="saveBtn" type="button">Speichern</button></div>
+</section>
+
+<div class="scrim" id="classScrim" hidden></div>
+<section class="sheet" id="classSheet" hidden aria-modal="true" role="dialog" aria-labelledby="classSheetTitle">
+  <div class="grip"></div>
+  <h2 id="classSheetTitle">Klassen-HÜ hinzufügen</h2>
+  <div class="field"><label for="cfTitle">Aufgabe</label><input type="text" id="cfTitle" placeholder="z. B. Arbeitsblatt 4"></div>
+  <div class="field"><label for="cfSubject">Fach</label><input type="text" id="cfSubject" placeholder="Fach wählen oder tippen"><div class="chips" id="classChips"></div></div>
+  <div class="field"><label for="cfDue">Fällig am</label><input type="date" id="cfDue"></div>
+  <div class="field"><label for="cfNote">Notiz</label><textarea id="cfNote" placeholder="Optional"></textarea></div>
+  <div class="field"><label for="cfFiles">Dateien</label><input type="file" id="cfFiles" multiple><p class="field-help">Mehrere Dateien möglich. Max. 10 GB.</p><div id="classFileQueue" class="file-queue"></div></div>
+  <div class="actions"><button class="cancel" id="classCancelBtn" type="button">Zurück</button><button class="del" id="classDelBtn" type="button" hidden>Löschen</button><button class="save" id="classSaveBtn" type="button">Hinzufügen</button></div>
+</section>
+
+<div class="scrim" id="suScrim" hidden></div>
+<section class="sheet" id="suSheet" hidden aria-modal="true" role="dialog" aria-labelledby="suSheetTitle">
+  <div class="grip"></div>
+  <h2 id="suSheetTitle">Schulübung hinzufügen</h2>
+  <div class="field"><label for="suTitle">Titel</label><input type="text" id="suTitle" placeholder="z. B. SÜ 3 – Vektoren"></div>
+  <div class="field"><label for="suSubject">Fach / Stunde</label><input type="text" id="suSubject" placeholder="Fach wählen oder tippen"><div class="chips" id="suChips"></div></div>
+  <div class="field"><label for="suDate">Stunde / Datum</label><input type="date" id="suDate"></div>
+  <div class="field"><label for="suNote">Notiz</label><textarea id="suNote" placeholder="Optional – was in der Stunde gemacht wurde"></textarea></div>
+  <div class="field"><label for="suFiles">Dateien</label><input type="file" id="suFiles" multiple><p class="field-help">Fotos, PDF, Arbeitsblätter. Max. 10 GB.</p><div id="suFileQueue" class="file-queue"></div></div>
+  <div class="actions"><button class="cancel" id="suCancelBtn" type="button">Zurück</button><button class="del" id="suDelBtn" type="button" hidden>Löschen</button><button class="save" id="suSaveBtn" type="button">Hinzufügen</button></div>
+</section>
+
+
+<div class="scrim" id="settingsScrim" hidden></div>
+<section class="sheet" id="settingsSheet" hidden aria-modal="true" role="dialog" aria-labelledby="settingsTitle">
+  <div class="grip"></div>
+  <h2 id="settingsTitle">Einstellungen</h2>
+  <div class="settings-tabs">
+    <button type="button" class="set-tab" data-set="notify" aria-selected="true">Benachrichtigungen</button>
+    <button type="button" class="set-tab" data-set="devices">Geräte</button>
+    <button type="button" class="set-tab" data-set="app">App</button>
+  </div>
+  <div id="setNotify">
+    <div class="check-row"><input type="checkbox" id="setNotifyEnabled" checked><label for="setNotifyEnabled" style="margin:0">Push-Benachrichtigungen</label></div>
+    <div class="check-row"><input type="checkbox" id="setNotifyClass" checked><label for="setNotifyClass" style="margin:0">Klassen-HÜ (neu + Erinnerungen)</label></div>
+    <div class="check-row"><input type="checkbox" id="setNotifyPersonal" checked><label for="setNotifyPersonal" style="margin:0">Persönliche Erinnerungen</label></div>
+    <div class="field"><label for="setRemindTime">Erinnerungszeit</label>
+      <input type="time" id="setRemindTime" value="10:00">
+      <p class="field-help">Push an diesem Zeitpunkt (Europe/Vienna), wenn Stufen greifen.</p>
+    </div>
+    <p class="field-help" style="margin:8px 0 4px;font-weight:600">Erinnerungs-Stufen</p>
+    <div class="check-row"><input type="checkbox" id="setStage2d"><label for="setStage2d" style="margin:0">2 Tage vorher</label></div>
+    <div class="check-row"><input type="checkbox" id="setStage1d" checked><label for="setStage1d" style="margin:0">1 Tag vorher (Schultag)</label></div>
+    <div class="check-row"><input type="checkbox" id="setStage0d"><label for="setStage0d" style="margin:0">Am Fälligkeitstag</label></div>
+  </div>
+  <div id="setDevices" hidden>
+    <p class="field-help">Geräte mit Push-Abo für deinen Account.</p>
+    <div id="deviceList" class="permission-list"></div>
+    <button type="button" class="small-btn" id="refreshDevices" style="margin-top:8px">Aktualisieren</button>
+  </div>
+  <div id="setApp" hidden>
+    <p class="field-help">App zum Home-Bildschirm: Browser-Menü → „Zum Home-Bildschirm“ / „Installieren“.</p>
+    <p class="field-help">Widget-Ansicht: kompakte Liste der nächsten HÜ.</p>
+    <button type="button" class="small-btn" id="openWidgetBtn">Widget-Ansicht öffnen</button>
+    <p class="field-help" id="offlineStatus" style="margin-top:12px">Offline-Status: …</p>
+  </div>
+  <div class="actions" style="margin-top:16px">
+    <button class="cancel" id="settingsClose" type="button">Schließen</button>
+    <button class="save" id="settingsSave" type="button">Speichern</button>
+  </div>
+</section>
+
+<div id="previewRoot" hidden></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="config.js"></script>
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import * as tus from "https://esm.sh/tus-js-client@4.3.1";
+
+const $ = id => document.getElementById(id);
+const cfg = window.CONFIG || {};
+const TABLE = "hausuebungen";
+const CLASS_TABLE = "klassen_huebungen";
+const FILE_TABLE = "hu_files";
+const SOL_TABLE = "hu_solutions";
+const PERM_TABLE = "klassen_hu_permissions";
+const COMP_TABLE = "class_hu_completions";
+const LOG_TABLE = "activity_logs";
+const SU_TABLE = "unterlagen";
+    const SETTINGS_TABLE = "user_settings";
+    const COMMENTS_TABLE = "hu_comments";
+    const LINKS_TABLE = "hu_links";
+    let userSettings = null;
+const sb = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+const ALLOWED = (cfg.USERS || []).map(x => String(x).toLowerCase());
+const toEmail = u => u.toLowerCase() + "@" + cfg.EMAIL_DOMAIN;
+const toName = e => (e || "").split("@")[0];
+const ADMIN_EMAILS = (cfg.ADMIN_EMAILS || [cfg.ADMIN_EMAIL || ""]).map(x => String(x || "").toLowerCase()).filter(Boolean);
+const isAdminEmail = e => ADMIN_EMAILS.includes((e || "").toLowerCase());
+const MAX_BYTES = cfg.MAX_UPLOAD_BYTES || 10 * 1024 * 1024 * 1024;
+const SUBJECTS = ["GGP","PH","SEW","RISL","RK","RE","Ethic","NWT","D","SOPK","AM","MEDT","GETE","E","GINF","ITSI"];
+
+let user = null, items = [], classItems = [], classDone = new Set(), permissions = [], filter = "open";
+let view = "personal", editingId = null, classEditingId = null, saving = false, toastTimer;
+let personalFiles = [], classFiles = [], suFiles = [], suItems = [], suEditingId = null, channels = [];
+let filterSubject = "", filterDue = "", filterImportant = false;
+let dragSrcId = null;
+
+if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) throw new Error("config missing");
+
+/* ─── Theme ─── */
+function applyTheme(t) {
+  document.documentElement.setAttribute("data-theme", t);
+  $("themeColor").content = t === "dark" ? "#121212" : "#ffffff";
+  $("themeBtn").textContent = t === "dark" ? "☀" : "☾";
+  localStorage.setItem("hu-theme", t);
+}
+(function initTheme() {
+  const saved = localStorage.getItem("hu-theme");
+  const pref = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  applyTheme(saved || pref);
+})();
+$("themeBtn").onclick = () => {
+  const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+  applyTheme(next);
+  haptic(8);
+};
+
+/* ─── Helpers ─── */
+const todayISO = () => {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+};
+/** Nächster Schultag (überspringt Sa/So) */
+function nextSchoolDayISO() {
+  const d = new Date();
+  for (let i = 1; i <= 4; i++) {
+    const c = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
+    const wd = c.getDay(); // 0=So, 6=Sa
+    if (wd !== 0 && wd !== 6) {
+      return c.getFullYear() + "-" + String(c.getMonth()+1).padStart(2,"0") + "-" + String(c.getDate()).padStart(2,"0");
+    }
+  }
+  return todayISO();
+}
+const daysFrom = iso => {
+  if (!iso) return null;
+  const a = new Date(todayISO() + "T00:00:00");
+  const b = new Date(iso + "T00:00:00");
+  return isNaN(b) ? null : Math.round((b - a) / 86400000);
+};
+const dueLabel = iso => {
+  const d = daysFrom(iso);
+  if (d === null) return "";
+  if (d < -1) return Math.abs(d) + " Tage über";
+  if (d === -1) return "Gestern fällig";
+  if (d === 0) return "Heute";
+  if (d === 1) {
+    const wd = new Date().getDay();
+    return (wd === 0 || wd === 6) ? "Montag" : "Morgen";
+  }
+  if (d < 7) return new Date(iso + "T00:00:00").toLocaleDateString("de-AT", { weekday: "long" });
+  return new Date(iso + "T00:00:00").toLocaleDateString("de-AT", { day: "numeric", month: "short" });
+};
+const fmtSize = n => n < 1024**2 ? Math.max(1, Math.round(n/1024)) + " KB" : n < 1024**3 ? (n/1024**2).toFixed(1) + " MB" : (n/1024**3).toFixed(2) + " GB";
+const safeName = n => n.replace(/[^a-zA-Z0-9._-]/g, "_");
+const projectRef = new URL(cfg.SUPABASE_URL).hostname.split(".")[0];
+const tusEndpoint = `https://${projectRef}.storage.supabase.co/storage/v1/upload/resumable`;
+const esc = s => { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; };
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 3200);
+}
+function haptic(ms = 10) {
+  try { if (navigator.vibrate) navigator.vibrate(ms); } catch {}
+}
+function isAdmin() { return !!user && isAdminEmail(user.email); }
+function canWriteClass() { return isAdmin() || permissions.some(p => p.user_id === user.id && p.can_write); }
+
+async function logActivity(action, detail = "") {
+  try {
+    await sb.from(LOG_TABLE).insert({
+      user_id: user.id,
+      user_name: toName(user.email),
+      action,
+      detail
+    });
+  } catch (e) { console.warn("log", e); }
+}
+
+/* ─── Views ─── */
+const VIEW_HASH = {
+  personal: "#/",
+  class: "#/klassen-hu",
+  unterlagen: "#/unterlagen",
+  week: "#/woche",
+  admin: "#/admin",
+  widget: "#/widget"
+};
+const HASH_VIEW = {
+  "": "personal", "/": "personal", "/personal": "personal", "/persoenlich": "personal",
+  "/klassen-hu": "class", "/klassen-hü": "class", "/klassen": "class", "/class": "class",
+  "/unterlagen": "unterlagen", "/su": "unterlagen", "/schuluebung": "unterlagen",
+  "/woche": "week", "/week": "week", "/diese-woche": "week",
+  "/admin": "admin",
+  "/widget": "widget",
+  "/einstellungen": "settings"
+};
+function hashToView(hash) {
+  let h = (hash || "").replace(/^#/, "").trim().toLowerCase();
+  if (!h) h = "/";
+  if (!h.startsWith("/")) h = "/" + h;
+  // normalize ü
+  h = h.replace(/ü/g, "u").replace(/%c3%bc/g, "u");
+  return HASH_VIEW[h] || null;
+}
+function setMainView(next, opts = {}) {
+  const known = ["personal", "class", "unterlagen", "week", "admin", "widget"];
+  if (!known.includes(next)) {
+    showNotFound();
+    return;
+  }
+  hideNotFound();
+  view = next;
+  $("personalView").hidden = next !== "personal";
+  $("classView").hidden = next !== "class";
+  $("unterlagenView").hidden = next !== "unterlagen";
+  $("weekView").hidden = next !== "week";
+  $("adminView").hidden = next !== "admin";
+  if ($("widgetView")) $("widgetView").hidden = next !== "widget";
+  $("personalBar").hidden = next !== "personal";
+  $("classBar").hidden = next !== "class" || !canWriteClass();
+  $("suBar").hidden = next !== "unterlagen" || !canWriteClass();
+  for (const b of document.querySelectorAll(".main-tabs button:not([hidden])")) {
+    b.setAttribute("aria-selected", b.dataset.view === next ? "true" : "false");
+  }
+  if (next === "class") loadClass();
+  if (next === "unterlagen") loadUnterlagen();
+  if (next === "admin") {
+    if (!isAdmin()) { setMainView("personal"); return; }
+    loadAdminUsers(); loadUserAdmin(); loadActivity(); refreshPushStatus(); loadResetCodes(); loadIpAdmin();
+  }
+  if (next === "week") renderWeek();
+  if (next === "widget") renderWidget();
+  updateOpenCount();
+  updateProgress();
+  if (!opts.fromHash) {
+    const want = VIEW_HASH[next] || "#/";
+    if (location.hash.replace(/ü/g, "u").toLowerCase() !== want.toLowerCase()) {
+      history.replaceState(null, "", want);
+    }
+  }
+}
+function showNotFound() {
+  const nf = $("notFoundScreen");
+  if (!nf) return;
+  $("auth").hidden = true;
+  // keep app visible behind? hide app chrome
+  if ($("app") && !$("app").hidden) {
+    // still logged in: overlay 404 over app content area via full screen
+  }
+  nf.hidden = false;
+  try { history.replaceState(null, "", "#/404"); } catch {}
+}
+function hideNotFound() {
+  const nf = $("notFoundScreen");
+  if (nf) nf.hidden = true;
+}
+function applyHashRoute() {
+  const raw = location.hash || "";
+  if (raw.toLowerCase().includes("banned")) {
+    checkIpBanOnStart();
+    return;
+  }
+  if (!$("banScreen")?.hidden) return; // gebannt: keine anderen Routes
+  if (raw.toLowerCase().includes("404")) { showNotFound(); return; }
+  const v = hashToView(raw);
+  if (v === null && raw && raw !== "#" && raw !== "#/") {
+    showNotFound();
+    return;
+  }
+  hideNotFound();
+  if (!user) return; // only route when logged in
+  if (v === "admin" && !isAdmin()) {
+    setMainView("personal", { fromHash: true });
+    return;
+  }
+  setMainView(v || "personal", { fromHash: true });
+}
+
+function updateAdminUI() {
+  $("adminTab").hidden = !isAdmin();
+  $("classBar").hidden = view !== "class" || !canWriteClass();
+  $("suBar").hidden = view !== "unterlagen" || !canWriteClass();
+  $("classPermissionNote").hidden = canWriteClass();
+  $("classPermissionNote").textContent = "Du hast derzeit kein Schreibrecht für Klassen HÜ / Unterlagen. Ein Admin kann es wieder freigeben.";
+  const suNote = $("suPermissionNote");
+  if (suNote) {
+    suNote.hidden = canWriteClass();
+    suNote.textContent = "Kein SÜ-Schreibrecht. Wer Klassen-HÜ schreiben darf, darf auch Unterlagen posten.";
+  }
+}
+
+/* ─── Auth ─── */
+
+function showBanScreen(reason, ip) {
+  // Sofort volle Ban-Ansicht – kein Login, keine App
+  $("auth").hidden = true;
+  $("app").hidden = true;
+  const nf = $("notFoundScreen"); if (nf) nf.hidden = true;
+  const b = $("banScreen");
+  if (!b) return;
+  b.hidden = false;
+  document.body.classList.add("banned");
+  if ($("banReason")) $("banReason").textContent = reason || "Verstoß gegen die Server-Regeln";
+  if ($("banIpShow")) $("banIpShow").textContent = ip || "—";
+  if ($("banWhen")) $("banWhen").textContent = new Date().toLocaleString("de-AT", { dateStyle: "medium", timeStyle: "short" });
+  try {
+    if (!location.hash.toLowerCase().includes("banned")) location.replace(location.pathname + location.search + "#/banned");
+  } catch {}
+}
+function hideBanScreen() {
+  const b = $("banScreen");
+  if (b) b.hidden = true;
+  document.body.classList.remove("banned");
+}
+async function checkIpBanOnStart() {
+  try {
+    const chk = await callPublicAuth({ action: "check_ban" });
+    if (chk.json?.banned) {
+      showBanScreen(chk.json.reason, chk.json.ip);
+      return true;
+    }
+  } catch {}
+  return false;
+}
+$("banRetry")?.addEventListener("click", async () => {
+  $("banRetry").disabled = true;
+  $("banRetry").textContent = "Prüfe …";
+  const banned = await checkIpBanOnStart();
+  $("banRetry").disabled = false;
+  $("banRetry").textContent = "Erneut prüfen";
+  if (!banned) {
+    hideBanScreen();
+    showAuth();
+    toast("Nicht mehr gesperrt – du kannst dich anmelden.");
+  }
+});
+function showAuth() {
+  hideBanScreen();
+  hideNotFound();
+  $("auth").hidden = false; $("app").hidden = true;
+  channels.forEach(c => sb.removeChannel(c)); channels = [];
+}
+async function showApp(session) {
+  user = session.user;
+  $("auth").hidden = true; $("app").hidden = false;
+  $("acctName").textContent = toName(user.email);
+  fillSubjectSelect();
+  await loadPermissions();
+  await Promise.all([loadPersonal(), loadClass(), loadUnterlagen()]);
+  subscribeAll();
+  applyHashRoute();
+  updateAdminUI();
+  setMainView("personal");
+  registerPush({ askIfNeeded: true });
+}
+
+async function callPublicAuth(payload) {
+  let res, text;
+  try {
+    res = await fetch(`${cfg.SUPABASE_URL}/functions/v1/auth-public`, {
+      method: "POST",
+      headers: {
+        apikey: cfg.SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${cfg.SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    text = await res.text();
+  } catch (e) {
+    const m = e?.message || String(e);
+    throw new Error(
+      (m === "Load failed" || m.includes("Failed to fetch") || m.includes("NetworkError"))
+        ? "Server nicht erreichbar. Function auth-public deployen (supabase functions deploy auth-public --no-verify-jwt)."
+        : m
+    );
+  }
+  let json = null;
+  try { json = JSON.parse(text); } catch { json = { raw: text }; }
+  if (!res.ok && !json?.error) json = { ...(json || {}), error: `HTTP ${res.status}: ${(text || "").slice(0, 120)}` };
+  return { ok: res.ok, status: res.status, json };
+}
+function showAuthMode(mode) {
+  $("authLogin").hidden = mode !== "login";
+  $("authRegister").hidden = mode !== "register";
+  $("authReset").hidden = mode !== "reset";
+  $("aErr").textContent = "";
+  $("rErr").textContent = "";
+  $("xErr").textContent = "";
+  $("authSub").textContent = mode === "register"
+    ? "Neuen Account anlegen (nur Benutzername + Passwort)."
+    : mode === "reset"
+      ? "Passwort zurücksetzen: Code kommt beim Admin an."
+      : "Melde dich an – funktioniert auf mehreren Geräten und über VPN/WLAN.";
+}
+$("goRegister")?.addEventListener("click", () => showAuthMode("register"));
+$("goReset")?.addEventListener("click", () => showAuthMode("reset"));
+$("backLogin1")?.addEventListener("click", () => showAuthMode("login"));
+$("backLogin2")?.addEventListener("click", () => showAuthMode("login"));
+$("rGo")?.addEventListener("click", async () => {
+  const username = $("rUser").value.trim();
+  const password = $("rPass").value;
+  const password2 = $("rPass2").value;
+  $("rErr").textContent = "";
+  $("rGo").disabled = true; $("rGo").textContent = "…";
+  try {
+    const r = await callPublicAuth({ action: "register", username, password, password2 });
+    if (!r.ok) throw new Error(r.json?.error || "Registrierung fehlgeschlagen");
+    $("aUser").value = username.toLowerCase();
+    $("aPass").value = password;
+    showAuthMode("login");
+    toast("Account erstellt – du kannst dich anmelden.");
+  } catch (e) { $("rErr").textContent = e.message || String(e); }
+  $("rGo").disabled = false; $("rGo").textContent = "Registrieren";
+});
+$("xRequest")?.addEventListener("click", async () => {
+  const username = $("xUser").value.trim();
+  $("xErr").textContent = "";
+  $("xRequest").disabled = true;
+  try {
+    const r = await callPublicAuth({ action: "request_reset", username });
+    if (!r.ok) throw new Error(r.json?.error || "Anfrage fehlgeschlagen");
+    $("xErr").textContent = r.json?.message || "Code an den Admin gesendet (falls Account existiert).";
+    $("xErr").style.color = "var(--ink-2)";
+  } catch (e) { $("xErr").style.color = ""; $("xErr").textContent = e.message || String(e); }
+  $("xRequest").disabled = false;
+});
+$("xConfirm")?.addEventListener("click", async () => {
+  const username = $("xUser").value.trim();
+  const code = $("xCode").value.trim();
+  const password = $("xPass").value;
+  const password2 = $("xPass2").value;
+  $("xErr").textContent = ""; $("xErr").style.color = "";
+  $("xConfirm").disabled = true;
+  try {
+    const r = await callPublicAuth({ action: "confirm_reset", username, code, password, password2 });
+    if (!r.ok) throw new Error(r.json?.error || "Reset fehlgeschlagen");
+    $("aUser").value = username.toLowerCase();
+    $("aPass").value = password;
+    showAuthMode("login");
+    toast("Passwort gesetzt – bitte anmelden.");
+  } catch (e) { $("xErr").textContent = e.message || String(e); }
+  $("xConfirm").disabled = false;
+});
+async function loadResetCodes() {
+  const list = $("resetCodeList");
+  if (!list) return;
+  list.innerHTML = '<p class="field-help">Lade …</p>';
+  try {
+    const r = await callNotifyFunction("auth-public", { action: "list_pending_resets" });
+    if (!r.ok) throw new Error(r.json?.error || "Fehler");
+    const rows = r.json?.resets || [];
+    if (!rows.length) { list.innerHTML = '<p class="field-help">Keine offenen Codes.</p>'; return; }
+    list.innerHTML = "";
+    for (const row of rows) {
+      const name = (row.email || "").split("@")[0];
+      const exp = new Date(row.expires_at).toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" });
+      const d = document.createElement("div");
+      d.className = "permission-row";
+      d.innerHTML = `<span><strong>${esc(name)}</strong> · Code <code>${esc(row.code)}</code></span><span class="field-help">bis ${esc(exp)}</span>`;
+      list.appendChild(d);
+    }
+  } catch (e) {
+    list.innerHTML = `<p class="field-help">${esc(e.message || String(e))}</p>`;
+  }
+}
+$("refreshResetCodes")?.addEventListener("click", () => loadResetCodes());
+
+async function doLogin() {
+  const username = $("aUser").value.trim().toLowerCase(), password = $("aPass").value;
+  $("aErr").textContent = "";
+  if (!username || !password) { $("aErr").textContent = "Benutzername und Passwort ausfüllen."; return; }
+  $("aGo").disabled = true; $("aGo").textContent = "Moment …";
+  try {
+    try {
+      const chk = await callPublicAuth({ action: "check_ban" });
+      if (chk.json?.banned) {
+        showBanScreen(chk.json.reason, chk.json.ip);
+        return;
+      }
+    } catch {}
+    const { data, error } = await sb.auth.signInWithPassword({ email: toEmail(username), password });
+    if (error) {
+      const m = (error.message || "").toLowerCase();
+      if (m.includes("invalid login") || m.includes("invalid credentials")) {
+        $("aErr").textContent = "Benutzername oder Passwort stimmt nicht.";
+      } else if (m.includes("not confirmed")) {
+        $("aErr").textContent = "Dieser Zugang ist noch nicht freigeschaltet.";
+      } else if (m.includes("network") || m.includes("fetch") || m.includes("failed")) {
+        $("aErr").textContent = "Netzwerkfehler – VPN/WLAN prüfen und erneut versuchen.";
+      } else {
+        $("aErr").textContent = error.message;
+      }
+      try { await callPublicAuth({ action: "log_session", event: "login_failed", user_email: toEmail(username), detail: error.message }); } catch {}
+      return;
+    }
+    $("aPass").value = "";
+    try {
+      const token = data.session?.access_token;
+      await fetch(`${cfg.SUPABASE_URL}/functions/v1/auth-public`, {
+        method: "POST",
+        headers: {
+          apikey: cfg.SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${token || cfg.SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ action: "log_session", event: "login", detail: "device-login" })
+      });
+    } catch {}
+  } finally {
+    $("aGo").disabled = false; $("aGo").textContent = "Anmelden";
+  }
+}
+$("aGo").addEventListener("click", doLogin);
+$("aUser").addEventListener("keydown", e => { if (e.key === "Enter") $("aPass").focus(); });
+$("aPass").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+$("logout").addEventListener("click", async () => { await sb.auth.signOut(); user = null; items = []; classItems = []; showAuth(); });
+sb.auth.onAuthStateChange(async (_e, session) => {
+  if (session && !user) {
+    const banned = await checkIpBanOnStart();
+    if (banned) { try { await sb.auth.signOut(); } catch {} return; }
+    showApp(session);
+  } else if (!session) {
+    if (!$("banScreen") || $("banScreen").hidden) showAuth();
+  }
+});
+
+
+/* ─── Settings / Links / Comments / Devices / Offline ─── */
+function parseLinkLines(text) {
+  const out = [];
+  for (const line of String(text || "").split("\n")) {
+    const t = line.trim();
+    if (!t) continue;
+    let title = "", url = t;
+    if (t.includes("|")) {
+      const i = t.indexOf("|");
+      title = t.slice(0, i).trim();
+      url = t.slice(i + 1).trim();
+    }
+    if (!/^https?:\/\//i.test(url)) continue;
+    out.push({ title: title || url, url });
+  }
+  return out;
+}
+async function saveLinksFor(parent, linesText) {
+  const links = parseLinkLines(linesText);
+  if (!links.length) return;
+  const rows = links.map(l => ({
+    owner_id: user.id,
+    title: l.title,
+    url: l.url,
+    hausuebung_id: parent.hausuebung_id || null,
+    class_hu_id: parent.class_hu_id || null,
+    unterlage_id: parent.unterlage_id || null
+  }));
+  const { error } = await sb.from(LINKS_TABLE).insert(rows);
+  if (error) console.warn("links", error);
+}
+async function loadLinks(parent, container) {
+  if (!container) return;
+  let q = sb.from(LINKS_TABLE).select("id,title,url,owner_id");
+  if (parent.hausuebung_id) q = q.eq("hausuebung_id", parent.hausuebung_id);
+  else if (parent.class_hu_id) q = q.eq("class_hu_id", parent.class_hu_id);
+  else if (parent.unterlage_id) q = q.eq("unterlage_id", parent.unterlage_id);
+  else return;
+  const { data } = await q;
+  container.innerHTML = "";
+  for (const l of data || []) {
+    const a = document.createElement("a");
+    a.className = "link-chip";
+    a.href = l.url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = "🔗 " + (l.title || l.url);
+    container.appendChild(a);
+  }
+}
+async function loadSettings() {
+  if (!user) return;
+  const { data } = await sb.from(SETTINGS_TABLE).select("*").eq("user_id", user.id).maybeSingle();
+  userSettings = data || {
+    notify_enabled: true, notify_class: true, notify_personal: true,
+    remind_time: "10:00", stage_2d: false, stage_1d: true, stage_0d: false
+  };
+  cacheOfflineSnapshot();
+}
+function fillSettingsForm() {
+  const s = userSettings || {};
+  $("setNotifyEnabled").checked = s.notify_enabled !== false;
+  $("setNotifyClass").checked = s.notify_class !== false;
+  $("setNotifyPersonal").checked = s.notify_personal !== false;
+  const t = String(s.remind_time || "10:00").slice(0, 5);
+  $("setRemindTime").value = t;
+  $("setStage2d").checked = !!s.stage_2d;
+  $("setStage1d").checked = s.stage_1d !== false;
+  $("setStage0d").checked = !!s.stage_0d;
+  $("offlineStatus").textContent = navigator.onLine
+    ? "Online – Daten werden aktualisiert."
+    : "Offline – letzte gespeicherte Listen werden angezeigt.";
+}
+async function openSettings() {
+  await loadSettings();
+  fillSettingsForm();
+  loadDevices();
+  showSheet("settingsSheet", "settingsScrim");
+}
+$("settingsBtn")?.addEventListener("click", openSettings);
+$("settingsClose")?.addEventListener("click", () => hideSheet("settingsSheet", "settingsScrim"));
+$("settingsScrim")?.addEventListener("click", () => hideSheet("settingsSheet", "settingsScrim"));
+document.querySelectorAll(".set-tab").forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll(".set-tab").forEach(b => b.setAttribute("aria-selected", b === btn ? "true" : "false"));
+    $("setNotify").hidden = btn.dataset.set !== "notify";
+    $("setDevices").hidden = btn.dataset.set !== "devices";
+    $("setApp").hidden = btn.dataset.set !== "app";
+  };
+});
+$("settingsSave")?.addEventListener("click", async () => {
+  if (!user) return;
+  const payload = {
+    user_id: user.id,
+    notify_enabled: $("setNotifyEnabled").checked,
+    notify_class: $("setNotifyClass").checked,
+    notify_personal: $("setNotifyPersonal").checked,
+    remind_time: ($("setRemindTime").value || "10:00") + ":00",
+    stage_2d: $("setStage2d").checked,
+    stage_1d: $("setStage1d").checked,
+    stage_0d: $("setStage0d").checked,
+    updated_at: new Date().toISOString()
+  };
+  const { error } = await sb.from(SETTINGS_TABLE).upsert(payload);
+  if (error) { toast("Speichern fehlgeschlagen: " + error.message); return; }
+  userSettings = payload;
+  toast("Einstellungen gespeichert.");
+  hideSheet("settingsSheet", "settingsScrim");
+});
+$("openWidgetBtn")?.addEventListener("click", () => {
+  hideSheet("settingsSheet", "settingsScrim");
+  setMainView("widget");
+});
+$("widgetBack")?.addEventListener("click", () => setMainView("personal"));
+$("refreshDevices")?.addEventListener("click", () => loadDevices());
+
+async function loadDevices() {
+  const el = $("deviceList");
+  if (!el || !user) return;
+  el.innerHTML = '<p class="field-help">Lade …</p>';
+  const { data, error } = await sb.from("push_subscriptions")
+    .select("id,endpoint,device_label,user_agent,last_seen,created_at")
+    .eq("user_id", user.id)
+    .order("last_seen", { ascending: false });
+  if (error) { el.innerHTML = `<p class="field-help">${esc(error.message)}</p>`; return; }
+  if (!data?.length) { el.innerHTML = '<p class="field-help">Keine Geräte mit Push-Abo.</p>'; return; }
+  el.innerHTML = "";
+  for (const d of data) {
+    const row = document.createElement("div");
+    row.className = "permission-row";
+    const label = d.device_label || (d.user_agent || "").slice(0, 40) || "Gerät";
+    const when = d.last_seen ? new Date(d.last_seen).toLocaleString("de-AT", { dateStyle: "short", timeStyle: "short" }) : "";
+    row.innerHTML = `<span><strong>${esc(label)}</strong><br><span class="field-help">${esc(when)}</span></span>`;
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "small-btn"; btn.textContent = "Entfernen";
+    btn.onclick = async () => {
+      await sb.from("push_subscriptions").delete().eq("id", d.id);
+      loadDevices();
+      toast("Gerät entfernt.");
+    };
+    row.appendChild(btn);
+    el.appendChild(row);
+  }
+}
+
+function cacheOfflineSnapshot() {
+  try {
+    localStorage.setItem("hu-offline", JSON.stringify({
+      at: Date.now(),
+      items: items.slice(0, 100),
+      classItems: classItems.slice(0, 100)
+    }));
+  } catch {}
+}
+function loadOfflineSnapshot() {
+  try {
+    const raw = localStorage.getItem("hu-offline");
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
+function renderWidget() {
+  const el = $("widgetList");
+  if (!el) return;
+  el.innerHTML = "";
+  const open = [
+    ...items.filter(i => !i.done).map(i => ({ title: i.title, subject: i.subject, due: i.due, kind: "persönlich" })),
+    ...classItems.filter(c => !classDone.has(c.id)).map(c => ({ title: c.title, subject: c.subject, due: c.due, kind: "Klasse" }))
+  ].sort((a, b) => String(a.due || "9999").localeCompare(String(b.due || "9999"))).slice(0, 8);
+  if (!open.length) {
+    el.innerHTML = '<div class="empty"><h2>Nichts offenes</h2></div>';
+    return;
+  }
+  for (const x of open) {
+    const card = document.createElement("div");
+    card.className = "week-card";
+    card.innerHTML = `<h4>${esc(x.subject || "–")} · ${esc(dueLabel(x.due) || x.due || "")}</h4>
+      <p style="margin:4px 0 0">${esc(x.title)} <span class="field-help">(${x.kind})</span></p>`;
+    el.appendChild(card);
+  }
+}
+
+async function loadComments(classHuId, container) {
+  if (!container || !classHuId) return;
+  const { data, error } = await sb.from(COMMENTS_TABLE).select("*").eq("class_hu_id", classHuId).order("created_at", { ascending: true });
+  container.innerHTML = "";
+  if (error) { container.innerHTML = '<span class="field-help">Kommentare nicht ladbar</span>'; return; }
+  for (const c of data || []) {
+    const row = document.createElement("div");
+    row.className = "comment-row";
+    const when = new Date(c.created_at).toLocaleString("de-AT", { dateStyle: "short", timeStyle: "short" });
+    row.innerHTML = `<div class="comment-meta"><strong>${esc(c.user_name || toName(c.user_email))}</strong> · ${esc(when)}</div>
+      <div class="comment-body">${esc(c.body)}</div>`;
+    if (isAdmin() || c.user_id === user.id) {
+      const del = document.createElement("button");
+      del.type = "button"; del.className = "small-btn"; del.textContent = "×";
+      del.onclick = async () => {
+        await sb.from(COMMENTS_TABLE).delete().eq("id", c.id);
+        loadComments(classHuId, container);
+      };
+      row.appendChild(del);
+    }
+    container.appendChild(row);
+  }
+  const form = document.createElement("div");
+  form.className = "comment-form";
+  const input = document.createElement("input");
+  input.type = "text"; input.placeholder = "Kommentar schreiben …"; input.maxLength = 500;
+  const send = document.createElement("button");
+  send.type = "button"; send.className = "small-btn"; send.textContent = "Senden";
+  send.onclick = async () => {
+    const body = input.value.trim();
+    if (!body) return;
+    const { error: e2 } = await sb.from(COMMENTS_TABLE).insert({
+      class_hu_id: classHuId,
+      user_id: user.id,
+      user_name: toName(user.email),
+      user_email: user.email,
+      body
+    });
+    if (e2) { toast(e2.message); return; }
+    input.value = "";
+    loadComments(classHuId, container);
+  };
+  form.appendChild(input); form.appendChild(send);
+  container.appendChild(form);
+}
+
+
+/* ─── Subjects ─── */
+function fillSubjectSelect() {
+  const sel = $("filterSubject");
+  sel.innerHTML = '<option value="">Alle Fächer</option>';
+  SUBJECTS.forEach(s => {
+    const o = document.createElement("option"); o.value = s; o.textContent = s; sel.appendChild(o);
+  });
+}
+function renderChips(containerId, inputId) {
+  const box = $(containerId); box.innerHTML = "";
+  SUBJECTS.forEach(s => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = s;
+    b.onclick = () => {
+      $(inputId).value = s;
+      box.querySelectorAll("button").forEach(x => x.classList.toggle("active", x.textContent === s));
+      haptic(5);
+    };
+    box.appendChild(b);
+  });
+}
+
+/* ─── Permissions ─── */
+
+async function ensureDefaultWrite() {
+  if (!user || isAdmin()) return;
+  try {
+    const mine = permissions.find(p => p.user_id === user.id);
+    if (mine) return;
+    // Kein Eintrag: anlegen (RLS erlaubt nur Admin insert – nutze RPC fallback skip)
+    // Trigger deckt neue User ab; für Alt-Accounts Admin-SQL.
+  } catch {}
+}
+async function loadIpAdmin() {
+  const bansEl = $("ipBanList");
+  const logsEl = $("ipLogList");
+  if (!bansEl || !logsEl) return;
+  bansEl.innerHTML = logsEl.innerHTML = '<p class="field-help">Lade …</p>';
+  try {
+    const [b, l] = await Promise.all([
+      callNotifyFunction("auth-public", { action: "list_ip_bans" }),
+      callNotifyFunction("auth-public", { action: "list_ip_logs" })
+    ]);
+    if (!b.ok) throw new Error(b.json?.error || "Bans laden fehlgeschlagen");
+    if (!l.ok) throw new Error(l.json?.error || "Logs laden fehlgeschlagen");
+    const bans = b.json?.bans || [];
+    bansEl.innerHTML = bans.filter(x => x.active).length ? "" : '<p class="field-help">Keine aktiven Bans.</p>';
+    for (const ban of bans.filter(x => x.active)) {
+      const row = document.createElement("div");
+      row.className = "permission-row";
+      row.innerHTML = `<span><code>${esc(ban.ip)}</code> ${ban.reason ? "· " + esc(ban.reason) : ""}</span>`;
+      const btn = document.createElement("button");
+      btn.type = "button"; btn.className = "small-btn"; btn.textContent = "Entsperren";
+      btn.onclick = async () => {
+        const r = await callNotifyFunction("auth-public", { action: "unban_ip", ip: ban.ip });
+        if (!r.ok) toast(r.json?.error || "Fehler"); else { toast("IP entsperrt"); loadIpAdmin(); }
+      };
+      row.appendChild(btn);
+      bansEl.appendChild(row);
+    }
+    const logs = l.json?.logs || [];
+    logsEl.innerHTML = logs.length ? "" : '<p class="field-help">Noch keine Einträge.</p>';
+    for (const log of logs.slice(0, 40)) {
+      const row = document.createElement("div");
+      row.className = "permission-row";
+      const when = new Date(log.created_at).toLocaleString("de-AT", { dateStyle: "short", timeStyle: "short" });
+      const who = log.user_email ? toName(log.user_email) : "—";
+      row.innerHTML = `<span><code>${esc(log.ip)}</code> · ${esc(log.action)} · ${esc(who)}<br><span class="field-help">${esc(when)}${log.detail ? " · " + esc(log.detail) : ""}</span></span>`;
+      if (log.ip) {
+        const banBtn = document.createElement("button");
+        banBtn.type = "button"; banBtn.className = "small-btn"; banBtn.textContent = "Ban";
+        banBtn.onclick = async () => {
+          const r = await callNotifyFunction("auth-public", { action: "ban_ip", ip: log.ip, reason: "Manuell aus Log" });
+          if (!r.ok) toast(r.json?.error || "Fehler"); else { toast("IP gesperrt"); loadIpAdmin(); }
+        };
+        row.appendChild(banBtn);
+      }
+      logsEl.appendChild(row);
+    }
+  } catch (e) {
+    bansEl.innerHTML = logsEl.innerHTML = `<p class="field-help">${esc(e.message || e)}</p>`;
+  }
+}
+$("refreshIpLog")?.addEventListener("click", () => loadIpAdmin());
+$("banIpBtn")?.addEventListener("click", async () => {
+  const ip = $("banIpInput")?.value.trim();
+  const reason = $("banIpReason")?.value.trim() || "";
+  if (!ip) { toast("IP eingeben"); return; }
+  const r = await callNotifyFunction("auth-public", { action: "ban_ip", ip, reason });
+  if (!r.ok) toast(r.json?.error || "Fehler");
+  else { toast("IP gesperrt"); $("banIpInput").value = ""; $("banIpReason").value = ""; loadIpAdmin(); }
+});
+async function loadPermissions() {
+  const { data, error } = await sb.from(PERM_TABLE).select("user_id,can_write,user_email");
+  if (error) { console.warn(error); if (isAdmin()) toast("Berechtigungen konnten nicht geladen werden."); return; }
+  permissions = data || [];
+  updateAdminUI();
+}
+
+async function adminUsersApi(payload) {
+  const r = await callNotifyFunction("admin-users", payload);
+  if (!r.ok) throw new Error(r.json?.error || r.json?.raw || ("HTTP " + r.status));
+  return r.json;
+}
+async function loadUserAdmin() {
+  const list = $("userAdminList");
+  const msg = $("userAdminMsg");
+  if (!list) return;
+  list.innerHTML = '<p class="field-help">Lade Benutzer …</p>';
+  try {
+    const data = await adminUsersApi({ action: "list" });
+    const users = data.users || [];
+    list.innerHTML = "";
+    if (!users.length) list.innerHTML = '<p class="field-help">Keine Benutzer.</p>';
+    for (const u of users) {
+      const mine = isAdminEmail(u.email);
+      const row = document.createElement("div");
+      row.className = "permission-row";
+      row.style.flexWrap = "wrap";
+      row.style.gap = "8px";
+      row.innerHTML = `<span style="min-width:90px">${esc(u.name)}${mine ? " <small>(Admin)</small>" : ""}</span>
+        <button type="button" class="small-btn" data-act="rename" data-id="${u.id}" data-name="${esc(u.name)}">Name</button>
+        <button type="button" class="small-btn" data-act="pass" data-id="${u.id}" data-name="${esc(u.name)}">Passwort</button>
+        ${mine ? "" : `<button type="button" class="small-btn danger-btn" data-act="del" data-id="${u.id}" data-name="${esc(u.name)}">Löschen</button>`}`;
+      list.appendChild(row);
+    }
+    list.querySelectorAll("button[data-act]").forEach(btn => {
+      btn.onclick = async () => {
+        const id = btn.dataset.id, name = btn.dataset.name, act = btn.dataset.act;
+        try {
+          if (act === "rename") {
+            const n = prompt("Neuer Benutzername für " + name + ":", name);
+            if (!n || n.trim().toLowerCase() === name.toLowerCase()) return;
+            await adminUsersApi({ action: "rename", userId: id, username: n });
+            toast(name + " heißt jetzt " + n.trim().toLowerCase());
+          } else if (act === "pass") {
+            const pw = prompt("Neues Passwort für " + name + " (min. 6 Zeichen):");
+            if (!pw) return;
+            await adminUsersApi({ action: "password", userId: id, password: pw });
+            toast("Passwort für " + name + " geändert.");
+          } else if (act === "del") {
+            if (!confirm(name + " wirklich löschen? Der Account ist danach weg.")) return;
+            await adminUsersApi({ action: "delete", userId: id });
+            toast(name + " gelöscht.");
+          }
+          await loadUserAdmin();
+          await loadAdminUsers();
+        } catch (e) { toast("Fehler: " + (e.message || e)); }
+      };
+    });
+  } catch (e) {
+    list.innerHTML = "";
+    if (msg) msg.textContent = "Benutzerliste: " + (e.message || e);
+  }
+}
+async function loadAdminUsers() {
+  const list = $("permissionList"); list.innerHTML = "";
+  // Live aus Auth + config, damit neue Registrierungen mitkommen
+  let names = (cfg.USERS || []).map(u => String(u).toLowerCase());
+  try {
+    const data = await adminUsersApi({ action: "list" });
+    const fromAuth = (data.users || []).map(u => (u.name || toName(u.email) || "").toLowerCase()).filter(Boolean);
+    names = [...new Set([...fromAuth, ...names])];
+  } catch (e) {
+    console.warn("user sync", e);
+  }
+  names = names.filter(n => n && n !== "admin").sort((a, b) => a.localeCompare(b, "de"));
+  for (const uname of names) {
+    const email = toEmail(uname);
+    const perm = permissions.find(p => p.user_email?.toLowerCase() === email.toLowerCase());
+    const adminRow = isAdminEmail(email);
+    const on = adminRow || !!perm?.can_write;
+    const row = document.createElement("div");
+    row.className = "permission-row";
+    row.innerHTML = adminRow
+      ? `<span>${esc(uname)}</span><span class="field-help">Admin (immer Schreiben)</span>`
+      : `<span>${esc(uname)}</span><button type="button" class="toggle-btn ${on ? "on" : ""}" data-email="${email}">${on ? "Schreiben erlaubt" : "Gesperrt"}</button>`;
+    list.appendChild(row);
+  }
+  list.querySelectorAll(".toggle-btn").forEach(btn => {
+    btn.onclick = async () => {
+      const email = btn.dataset.email;
+      const next = !btn.classList.contains("on");
+      btn.disabled = true;
+      try {
+        const { error } = await sb.rpc("set_class_hu_permission", { p_email: email, p_can_write: next });
+        if (error) throw error;
+        btn.classList.toggle("on", next);
+        btn.textContent = next ? "Schreiben erlaubt" : "Gesperrt";
+        await loadPermissions();
+        await logActivity(next ? "permission_grant" : "permission_revoke", toName(email));
+        toast(next ? `${toName(email)} darf jetzt schreiben.` : `Schreibrecht für ${toName(email)} entzogen.`);
+        haptic(15);
+      } catch (e) {
+        const msg = e.message || String(e);
+        if (msg.includes("noch nie angemeldet")) toast("Benutzer muss sich einmal anmelden, bevor Rechte gesetzt werden können.");
+        else toast("Fehler: " + msg);
+      }
+      btn.disabled = false;
+    };
+  });
+}
+async function loadActivity() {
+  const list = $("activityList");
+  const { data } = await sb.from(LOG_TABLE).select("*").order("created_at", { ascending: false }).limit(40);
+  list.innerHTML = "";
+  if (!data?.length) { list.innerHTML = '<p class="field-help">Noch keine Aktivität.</p>'; return; }
+  for (const a of data) {
+    const d = new Date(a.created_at);
+    const time = d.toLocaleString("de-AT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    const labels = {
+      create_personal: "Persönliche HÜ erstellt",
+      update_personal: "Persönliche HÜ bearbeitet",
+      delete_personal: "Persönliche HÜ gelöscht",
+      create_class: "Klassen-HÜ erstellt",
+      update_class: "Klassen-HÜ bearbeitet",
+      delete_class: "Klassen-HÜ gelöscht",
+      permission_grant: "Schreibrecht vergeben",
+      permission_revoke: "Schreibrecht entzogen"
+    };
+    const div = document.createElement("div");
+    div.className = "activity-item";
+    div.innerHTML = `<div class="act-time">${esc(time)} · ${esc(a.user_name)}</div><div class="act-text">${esc(labels[a.action] || a.action)}${a.detail ? ": " + esc(a.detail) : ""}</div>`;
+    list.appendChild(div);
+  }
+}
+
+const addUserBtn = $("addUserBtn");
+if (addUserBtn) addUserBtn.onclick = async () => {
+  const username = $("newUserName").value.trim();
+  const password = $("newUserPass").value;
+  $("userAdminMsg").textContent = "";
+  try {
+    await adminUsersApi({ action: "create", username, password });
+    $("newUserName").value = ""; $("newUserPass").value = "";
+    $("userAdminMsg").textContent = username + " angelegt.";
+    toast("Benutzer angelegt.");
+    await loadUserAdmin();
+    await loadAdminUsers();
+  } catch (e) { $("userAdminMsg").textContent = e.message || String(e); }
+};
+$("testLocalPush").onclick = async () => {
+  $("pushTestResult").textContent = "Sende lokale Nachricht …";
+  const r = await registerPush({ askIfNeeded: false });
+  if (Notification.permission !== "granted") {
+    $("pushTestResult").textContent = "Keine Berechtigung. Beim nächsten frischen Start (oder nach Reset) wird einmal gefragt.";
+    toast("Push-Berechtigung fehlt.");
+    return;
+  }
+  const ok = await showLocalNotification("Test: Hausübungen", "Lokale Test-Benachrichtigung funktioniert.", "admin-test-local");
+  $("pushTestResult").textContent = ok ? "Lokale Nachricht gesendet. Schau in die System-Benachrichtigungen." : "Lokale Nachricht fehlgeschlagen.";
+  toast(ok ? "Test-Nachricht gesendet." : "Test fehlgeschlagen.");
+};
+$("testRemotePush").onclick = async () => {
+  $("pushTestResult").textContent = "Sende Push an alle Abos …";
+  try {
+    const r = await callNotifyFunction("send-class-notification", {
+      title: "Test: Push an alle",
+      body: "Admin hat eine Test-Benachrichtigung ausgelöst.",
+      tag: "admin-test-remote"
+    });
+    $("pushTestResult").textContent = r.ok
+      ? `Push-Function OK (${r.status}). Gesendet: ${r.json?.sent ?? "?"} von ${r.json?.total ?? "?"}.`
+      : `Function-Fehler ${r.status}: ${JSON.stringify(r.json)}`;
+    toast(r.ok ? "Remote-Push ausgelöst." : "Remote-Push fehlgeschlagen.");
+  } catch (e) {
+    $("pushTestResult").textContent = "Fehler: " + (e.message || e);
+  }
+  refreshPushStatus();
+};
+$("testDailyPush").onclick = async () => {
+  $("pushTestResult").textContent = "Löse Erinnerung „1 Tag vorher“ aus …";
+  try {
+    const r = await callNotifyFunction("daily-reminders", { force: true, });
+    $("pushTestResult").textContent = r.ok
+      ? `Erinnerung OK. Nächster Schultag: ${r.json?.date || "?"} · gesendet: ${r.json?.sent ?? "?"}`
+      : `Function-Fehler ${r.status}: ${JSON.stringify(r.json)}`;
+    toast(r.ok ? "Erinnerung ausgelöst." : "Erinnerung fehlgeschlagen – Function neu deployen?");
+  } catch (e) {
+    $("pushTestResult").textContent = "Fehler: " + (e.message || e);
+  }
+};
+$("refreshPushStatus").onclick = () => refreshPushStatus();
+$("testArchiveClass") && ($("testArchiveClass").onclick = async () => {
+  $("pushTestResult").textContent = "Archiviere …";
+  try {
+    const r = await callNotifyFunction("archive-class-hu", {});
+    $("pushTestResult").textContent = r.ok
+      ? `Archiv OK: ${r.json?.personal_created ?? 0} persönliche Einträge, ${r.json?.deleted_class_ids ?? 0} Klassen-HÜ gelöscht (Datum ${r.json?.date || "?"}).`
+      : `Fehler ${r.status}: ${JSON.stringify(r.json)}`;
+    await loadClass(); await loadPersonal();
+  } catch (e) { $("pushTestResult").textContent = String(e.message || e); }
+});
+
+/* ─── Push ─── */
+const PUSH_ASKED_KEY = "hu-push-asked";
+async function registerPush(opts = { askIfNeeded: true }) {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !cfg.PUSH_VAPID_PUBLIC_KEY) return { ok: false, reason: "Browser unterstützt kein Web-Push." };
+  try {
+    const reg = await navigator.serviceWorker.register("./sw.js");
+    let perm = Notification.permission;
+    const alreadyAsked = localStorage.getItem(PUSH_ASKED_KEY) === "1";
+    if (perm === "default" && opts.askIfNeeded && !alreadyAsked) {
+      perm = await Notification.requestPermission();
+      localStorage.setItem(PUSH_ASKED_KEY, "1");
+    }
+    if (perm !== "granted") return { ok: false, reason: perm === "denied" ? "Berechtigung blockiert." : "Noch nicht erlaubt.", perm };
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64ToUint8(cfg.PUSH_VAPID_PUBLIC_KEY) });
+    await sb.from("push_subscriptions").upsert({
+      user_id: user.id,
+      endpoint: sub.endpoint,
+      subscription: sub.toJSON(),
+      device_label: (navigator.userAgentData?.platform || navigator.platform || "Gerät") + " · " + (navigator.userAgent || "").slice(0, 48),
+      user_agent: (navigator.userAgent || "").slice(0, 300),
+      last_seen: new Date().toISOString()
+    }, { onConflict: "endpoint" });
+    return { ok: true, perm, endpoint: sub.endpoint };
+  } catch (e) {
+    console.warn("Push", e);
+    return { ok: false, reason: e.message || String(e) };
+  }
+}
+function base64ToUint8(s) {
+  const pad = "=".repeat((4 - s.length % 4) % 4);
+  const raw = atob((s + pad).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+async function showLocalNotification(title, body, tag) {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    await reg.showNotification(title, { body, icon: "icon.jpg", badge: "icon.jpg", tag: tag || "hu", data: { url: "./" } });
+    return true;
+  } catch (e) {
+    if (Notification.permission === "granted") {
+      new Notification(title, { body });
+      return true;
+    }
+    return false;
+  }
+}
+async function callNotifyFunction(path, extra = {}) {
+  let { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    const refreshed = await sb.auth.refreshSession();
+    session = refreshed.data.session;
+  }
+  if (!session?.access_token) throw new Error("Nicht angemeldet – bitte neu einloggen.");
+  const res = await fetch(`${cfg.SUPABASE_URL}/functions/v1/${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: cfg.SUPABASE_ANON_KEY,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(extra)
+  });
+  const text = await res.text();
+  let json = null;
+  try { json = JSON.parse(text); } catch { json = { raw: text }; }
+  return { ok: res.ok, status: res.status, json };
+}
+async function refreshPushStatus() {
+  const el = $("pushStatus");
+  if (!el) return;
+  const sw = "serviceWorker" in navigator;
+  const pm = "PushManager" in window;
+  const perm = typeof Notification !== "undefined" ? Notification.permission : "n/a";
+  let sub = null;
+  try {
+    const reg = sw ? await navigator.serviceWorker.getRegistration() : null;
+    sub = reg ? await reg.pushManager.getSubscription() : null;
+  } catch {}
+  const { count } = await sb.from("push_subscriptions").select("id", { count: "exact", head: true }).eq("user_id", user.id);
+  el.innerHTML =
+    `Browser-Push: ${sw && pm ? "ja" : "nein"} · Berechtigung: <strong>${perm}</strong><br>` +
+    `Dieses Gerät abonniert: ${sub ? "ja" : "nein"} · gespeicherte Abos (dieser Account): ${count ?? "?"}<br>` +
+    `Erste Nachfrage schon gestellt: ${localStorage.getItem(PUSH_ASKED_KEY) === "1" ? "ja" : "nein"}`;
+}
+
+/* ─── Progress ─── */
+function updateProgress() {
+  const openP = items.filter(i => !i.done).length;
+  const doneP = items.filter(i => i.done).length;
+  const totalP = items.length;
+  const openC = classItems.filter(c => !classDone.has(c.id)).length;
+  const doneC = classItems.filter(c => classDone.has(c.id)).length;
+  const total = totalP + classItems.length;
+  const done = doneP + doneC;
+  const open = openP + openC;
+  if (!total) {
+    $("progressText").textContent = "Keine HÜ";
+    $("progressPct").textContent = "";
+    $("progressFill").style.width = "0%";
+    return;
+  }
+  const pct = Math.round((done / total) * 100);
+  $("progressText").textContent = `${done} von ${total} erledigt`;
+  $("progressPct").textContent = pct + "%";
+  $("progressFill").style.width = pct + "%";
+}
+function updateOpenCount() {
+  const openP = items.filter(i => !i.done).length;
+  const openC = classItems.filter(c => !classDone.has(c.id)).length;
+  const total = openP + openC;
+  $("openCount").textContent = total === 0 ? "Alles erledigt" : total === 1 ? "1 offene HÜ" : total + " offene HÜ";
+  updateProgress();
+}
+
+/* ─── Personal ─── */
+async function loadPersonal() {
+  const { data, error } = await sb.from(TABLE).select("*").order("sort_order", { ascending: true }).order("due", { ascending: true, nullsFirst: false });
+  if (error) { toast("Persönliche HÜ konnten nicht geladen werden."); return; }
+  items = data || [];
+  renderPersonal();
+}
+function matchesAdv(it) {
+  if (filterSubject && (it.subject || "").toUpperCase() !== filterSubject.toUpperCase()) return false;
+  if (filterDue && it.due !== filterDue) return false;
+  if (filterImportant && !it.important) return false;
+  return true;
+}
+function renderPersonal() {
+  const list = $("list"), empty = $("empty");
+  list.innerHTML = "";
+  const schoolDay = nextSchoolDayISO();
+  const tTab = $("tomorrowTab");
+  if (tTab) {
+    const wd = new Date().getDay();
+    tTab.textContent = (wd === 0 || wd === 6) ? "Montag" : "Morgen";
+  }
+  let filtered = items.filter(it => {
+    if (filter === "open") return !it.done;
+    if (filter === "done") return it.done;
+    if (filter === "tomorrow") return !it.done && it.due === schoolDay;
+    return true;
+  }).filter(matchesAdv);
+
+  // sort: important first within filter, then sort_order, then due
+  filtered = [...filtered].sort((a, b) => {
+    if (a.important !== b.important) return a.important ? -1 : 1;
+    if ((a.sort_order || 0) !== (b.sort_order || 0)) return (a.sort_order || 0) - (b.sort_order || 0);
+    if (a.due && b.due) return a.due.localeCompare(b.due);
+    return 0;
+  });
+
+  if (!filtered.length) {
+    empty.hidden = false;
+    empty.innerHTML = filter === "open" ? "<h2>Nichts offenes</h2><p>Alle persönlichen Hausübungen sind erledigt.</p>"
+      : filter === "done" ? "<h2>Noch nichts erledigt</h2><p>Erledigte Einträge erscheinen hier.</p>"
+      : filter === "tomorrow" ? "<h2>Nichts für den nächsten Schultag</h2><p>Keine offenen HÜ für morgen (bzw. Montag).</p>"
+      : "<h2>Keine Einträge</h2><p>Tippe unten auf „Neue Hausübung“.</p>";
+    updateOpenCount();
+    return;
+  }
+  empty.hidden = true;
+
+  for (const it of filtered) {
+    const d = daysFrom(it.due);
+    const wrap = document.createElement("div");
+    wrap.className = "swipe-wrap";
+    wrap.dataset.id = it.id;
+    wrap.innerHTML = `<div class="swipe-bg"><span class="left">Erledigt</span><span class="right">Löschen</span></div>`;
+    const li = document.createElement("div");
+    li.className = "row"
+      + (it.done ? " done" : "")
+      + (it.important ? " important" : "")
+      + (d !== null && d < 0 && !it.done ? " overdue" : "")
+      + (d === 0 && !it.done ? " due-today" : "")
+      + (d === 1 && !it.done ? " due-tomorrow" : "");
+    li.draggable = true;
+    li.dataset.id = it.id;
+    li.innerHTML = `
+      <span class="drag-handle" title="Ziehen zum Sortieren">⠿</span>
+      <button class="box" type="button" aria-pressed="${it.done}" aria-label="Erledigt">
+        <svg viewBox="0 0 24 24"><polyline points="5 13 10 18 19 7"/></svg>
+      </button>
+      <button class="body" type="button">
+        <p class="subject">${esc(it.subject || "")}${it.important ? " · Wichtig" : ""}</p>
+        <p class="title">${esc(it.title)}</p>
+        ${it.note ? `<p class="note">${esc(it.note)}</p>` : ""}
+      </button>
+      <span class="due ${d !== null && d < 0 ? "late" : ""}">${dueLabel(it.due)}</span>`;
+    wrap.appendChild(li);
+    list.appendChild(wrap);
+
+    li.querySelector(".box").onclick = e => { e.stopPropagation(); toggleDone(it); };
+    li.querySelector(".body").onclick = () => openSheet(it);
+    setupSwipe(wrap, it);
+    setupDrag(li, it);
+  }
+  updateOpenCount();
+}
+
+/* Swipe */
+function setupSwipe(wrap, it) {
+  let startX = 0, currentX = 0, dragging = false;
+  const row = wrap.querySelector(".row");
+  const onStart = e => {
+    if (e.target.closest(".box") || e.target.closest(".drag-handle")) return;
+    startX = e.touches ? e.touches[0].clientX : e.clientX;
+    dragging = true;
+    row.style.transition = "none";
+  };
+  const onMove = e => {
+    if (!dragging) return;
+    currentX = (e.touches ? e.touches[0].clientX : e.clientX) - startX;
+    if (Math.abs(currentX) < 8) return;
+    row.style.transform = `translateX(${currentX}px)`;
+    wrap.classList.toggle("swiping-done", currentX > 40);
+    wrap.classList.toggle("swiping-del", currentX < -40);
+  };
+  const onEnd = async () => {
+    if (!dragging) return;
+    dragging = false;
+    row.style.transition = "transform .2s ease";
+    if (currentX > 80) {
+      row.style.transform = "translateX(100%)";
+      haptic(20);
+      await toggleDone(it);
+      row.style.transform = "";
+    } else if (currentX < -80) {
+      row.style.transform = "translateX(-100%)";
+      haptic([20, 30, 20]);
+      if (confirm("Diese Hausübung löschen?")) await deletePersonal(it.id);
+      else row.style.transform = "";
+    } else {
+      row.style.transform = "";
+    }
+    wrap.classList.remove("swiping-done", "swiping-del");
+    currentX = 0;
+  };
+  wrap.addEventListener("touchstart", onStart, { passive: true });
+  wrap.addEventListener("touchmove", onMove, { passive: true });
+  wrap.addEventListener("touchend", onEnd);
+}
+
+/* Drag & Drop sort */
+function setupDrag(li, it) {
+  li.addEventListener("dragstart", e => {
+    dragSrcId = it.id;
+    li.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+  });
+  li.addEventListener("dragend", () => li.classList.remove("dragging"));
+  li.addEventListener("dragover", e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; });
+  li.addEventListener("drop", async e => {
+    e.preventDefault();
+    if (!dragSrcId || dragSrcId === it.id) return;
+    const fromIdx = items.findIndex(x => x.id === dragSrcId);
+    const toIdx = items.findIndex(x => x.id === it.id);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(toIdx, 0, moved);
+    // reassign sort_order
+    const updates = items.map((x, i) => ({ id: x.id, sort_order: i }));
+    items.forEach((x, i) => { x.sort_order = i; });
+    renderPersonal();
+    haptic(8);
+    try {
+      await Promise.all(updates.map(u => sb.from(TABLE).update({ sort_order: u.sort_order }).eq("id", u.id)));
+    } catch (err) { console.warn(err); }
+    dragSrcId = null;
+  });
+}
+
+async function toggleDone(it) {
+  const next = !it.done;
+  const { error } = await sb.from(TABLE).update({ done: next, done_at: next ? new Date().toISOString() : null }).eq("id", it.id);
+  if (error) { toast("Konnte Status nicht ändern."); return; }
+  it.done = next; it.done_at = next ? new Date().toISOString() : null;
+  haptic(12);
+  renderPersonal();
+}
+async function deletePersonal(id) {
+  const { error } = await sb.from(TABLE).delete().eq("id", id);
+  if (error) { toast("Löschen fehlgeschlagen."); return; }
+  const title = items.find(i => i.id === id)?.title || "";
+  items = items.filter(i => i.id !== id);
+  await logActivity("delete_personal", title);
+  renderPersonal();
+  toast("Gelöscht.");
+}
+
+function openSheet(it) {
+  editingId = it ? it.id : null;
+  $("sheetTitle").textContent = it ? "Hausübung bearbeiten" : "Neue Hausübung";
+  $("fTitle").value = it?.title || "";
+  $("fSubject").value = it?.subject || "";
+  $("fDue").value = it?.due || "";
+  $("fNote").value = it?.note || "";
+  $("fImportant").checked = !!it?.important;
+  $("delBtn").hidden = !it;
+  personalFiles = [];
+  $("fFiles").value = "";
+  $("fileQueue").innerHTML = "";
+  $("existingFiles").innerHTML = "";
+  if ($("fLinks")) $("fLinks").value = "";
+  if ($("existingLinks")) $("existingLinks").innerHTML = "";
+  if (it) {
+    loadExistingFiles(it.id, null, "existingFiles");
+    loadLinks({ hausuebung_id: it.id }, $("existingLinks"));
+  }
+  renderChips("chips", "fSubject");
+  showSheet("sheet", "scrim");
+}
+$("addBtn").onclick = () => openSheet(null);
+$("cancelBtn").onclick = () => hideSheet("sheet", "scrim");
+$("scrim").onclick = () => hideSheet("sheet", "scrim");
+$("delBtn").onclick = async () => {
+  if (!editingId || !confirm("Diese Hausübung wirklich löschen?")) return;
+  await deletePersonal(editingId);
+  hideSheet("sheet", "scrim");
+};
+$("fFiles").onchange = () => {
+  personalFiles = Array.from($("fFiles").files || []);
+  const q = $("fileQueue"); q.innerHTML = "";
+  personalFiles.forEach(f => {
+    const d = document.createElement("div");
+    d.textContent = `${f.name} (${fmtSize(f.size)})`;
+    if (f.size > MAX_BYTES) d.style.color = "var(--red)";
+    q.appendChild(d);
+  });
+};
+$("saveBtn").onclick = async () => {
+  if (saving) return;
+  const title = $("fTitle").value.trim();
+  if (!title) { toast("Bitte eine Aufgabe eingeben."); return; }
+  const payload = {
+    title,
+    subject: $("fSubject").value.trim(),
+    due: $("fDue").value || null,
+    note: $("fNote").value.trim(),
+    important: $("fImportant").checked
+  };
+  if (personalFiles.some(f => f.size > MAX_BYTES)) { toast("Eine Datei ist größer als 10 GB."); return; }
+  saving = true; $("saveBtn").disabled = true; $("saveBtn").textContent = "Speichern …";
+  try {
+    let id = editingId;
+    if (editingId) {
+      const { error } = await sb.from(TABLE).update(payload).eq("id", editingId);
+      if (error) throw error;
+      const idx = items.findIndex(i => i.id === editingId);
+      if (idx >= 0) items[idx] = { ...items[idx], ...payload };
+      await logActivity("update_personal", title);
+    } else {
+      payload.sort_order = items.length ? Math.max(...items.map(i => i.sort_order || 0)) + 1 : 0;
+      const { data, error } = await sb.from(TABLE).insert(payload).select().single();
+      if (error) throw error;
+      items.unshift(data); id = data.id;
+      await logActivity("create_personal", title);
+    }
+    if (personalFiles.length) await uploadFiles(personalFiles, "personal", id, null);
+    if ($("fLinks")?.value.trim()) await saveLinksFor({ hausuebung_id: id }, $("fLinks").value);
+    hideSheet("sheet", "scrim");
+    renderPersonal();
+    toast(editingId ? "Gespeichert." : "Hinzugefügt.");
+    if (!editingId) {
+      showLocalNotification("Neue Hausübung", `${payload.subject ? payload.subject + ": " : ""}${title}`, "personal-hu");
+    }
+    haptic(15);
+  } catch (e) { toast("Fehler: " + (e.message || e)); }
+  finally { saving = false; $("saveBtn").disabled = false; $("saveBtn").textContent = "Speichern"; }
+};
+
+/* Filters */
+document.querySelectorAll(".filters button").forEach(b => {
+  b.onclick = () => {
+    filter = b.dataset.filter;
+    document.querySelectorAll(".filters button").forEach(x => x.setAttribute("aria-selected", x.dataset.filter === filter ? "true" : "false"));
+    renderPersonal();
+  };
+});
+$("filterSubject").onchange = () => { filterSubject = $("filterSubject").value; renderPersonal(); };
+$("filterDue").onchange = () => { filterDue = $("filterDue").value; renderPersonal(); };
+$("filterImportant").onchange = () => { filterImportant = $("filterImportant").checked; renderPersonal(); };
+
+/* ─── Class ─── */
+async function loadClass() {
+  const [{ data: cls, error: e1 }, { data: comps }] = await Promise.all([
+    sb.from(CLASS_TABLE).select("*").order("due", { ascending: true, nullsFirst: false }).order("created_at", { ascending: false }),
+    sb.from(COMP_TABLE).select("class_hu_id").eq("done", true)
+  ]);
+  if (e1) { toast("Klassen-HÜ konnten nicht geladen werden."); return; }
+  classItems = cls || [];
+  classDone = new Set((comps || []).map(c => c.class_hu_id));
+  renderClass();
+}
+function renderClass() {
+  const list = $("classList"), empty = $("classEmpty");
+  list.innerHTML = "";
+  if (!classItems.length) {
+    empty.hidden = false;
+    empty.innerHTML = "<h2>Noch keine Klassen-HÜ</h2><p>Sobald jemand eine hinzufügt, erscheint sie hier.</p>";
+    updateOpenCount();
+    return;
+  }
+  empty.hidden = true;
+  for (const it of classItems) {
+    const done = classDone.has(it.id);
+    const d = daysFrom(it.due);
+    const card = document.createElement("div");
+    card.className = "class-card"
+      + (done ? " done" : "")
+      + (d !== null && d < 0 && !done ? " overdue" : "")
+      + (d === 0 && !done ? " due-today" : "")
+      + (d === 1 && !done ? " due-tomorrow" : "");
+    card.innerHTML = `
+      <div class="class-top">
+        <div>
+          <p class="subject">${esc(it.subject || "")}</p>
+          <h3>${esc(it.title)}</h3>
+          ${it.note ? `<p class="note">${esc(it.note)}</p>` : ""}
+          <p class="added-by">Hinzugefügt von ${esc(it.created_by_name || toName(it.created_by_email))}</p>
+        </div>
+        <span class="due ${d !== null && d < 0 ? "late" : ""}">${dueLabel(it.due)}</span>
+      </div>
+      <div class="attachments" data-files="${it.id}"></div>
+      <div class="link-list" data-links="${it.id}"></div>
+      <div class="solutions-block">
+        <p class="solutions-label">Lösungen</p>
+        <div class="attachments solutions-list" data-solutions="${it.id}"></div>
+        <label class="small-btn sol-upload-label">Lösung hochladen
+          <input type="file" class="sol-file-input" data-sol-class="${it.id}" multiple hidden>
+        </label>
+      </div>
+      <div class="comments-block">
+        <p class="solutions-label">Kommentare</p>
+        <div class="comments-list" data-comments="${it.id}"></div>
+      </div>
+      <div class="class-actions">
+        <button type="button" class="toggle-btn ${done ? "on" : ""}" data-toggle="${it.id}">${done ? "Erledigt ✓" : "Als erledigt markieren"}</button>
+        ${(isAdmin() || it.created_by === user.id) ? `<button type="button" class="small-btn" data-edit="${it.id}">Bearbeiten</button>` : ""}
+      </div>`;
+    list.appendChild(card);
+    loadExistingFiles(null, it.id, card.querySelector("[data-files]"));
+    loadLinks({ class_hu_id: it.id }, card.querySelector("[data-links]"));
+    loadSolutions(it.id, card.querySelector("[data-solutions]"));
+    loadComments(it.id, card.querySelector("[data-comments]"));
+  }
+  list.querySelectorAll("[data-toggle]").forEach(btn => {
+    btn.onclick = () => toggleClassDone(btn.dataset.toggle);
+  });
+  list.querySelectorAll("[data-edit]").forEach(btn => {
+    btn.onclick = () => {
+      const it = classItems.find(c => c.id === btn.dataset.edit);
+      if (it) openClassSheet(it);
+    };
+  });
+  list.querySelectorAll(".sol-file-input").forEach(inp => {
+    inp.onchange = async () => {
+      const classId = inp.dataset.solClass;
+      const files = Array.from(inp.files || []);
+      if (!files.length) return;
+      try {
+        toast("Lösung wird hochgeladen …");
+        await uploadSolutions(files, classId);
+        toast("Lösung hinzugefügt.");
+        const box = list.querySelector(`[data-solutions="${classId}"]`);
+        if (box) await loadSolutions(classId, box);
+        haptic(12);
+      } catch (e) { toast("Fehler: " + (e.message || e)); }
+      inp.value = "";
+    };
+  });
+  updateOpenCount();
+}
+async function toggleClassDone(id) {
+  const currently = classDone.has(id);
+  if (currently) {
+    const { error } = await sb.from(COMP_TABLE).delete().eq("class_hu_id", id).eq("user_id", user.id);
+    if (error) { toast("Konnte Status nicht ändern."); return; }
+    classDone.delete(id);
+  } else {
+    const { error } = await sb.from(COMP_TABLE).upsert({ class_hu_id: id, user_id: user.id, done: true, done_at: new Date().toISOString() });
+    if (error) { toast("Konnte Status nicht ändern."); return; }
+    classDone.add(id);
+  }
+  haptic(12);
+  renderClass();
+}
+function openClassSheet(it) {
+  classEditingId = it ? it.id : null;
+  $("classSheetTitle").textContent = it ? "Klassen-HÜ bearbeiten" : "Klassen-HÜ hinzufügen";
+  $("cfTitle").value = it?.title || "";
+  $("cfSubject").value = it?.subject || "";
+  $("cfDue").value = it?.due || "";
+  $("cfNote").value = it?.note || "";
+  $("classDelBtn").hidden = !it || !(isAdmin() || it.created_by === user.id);
+  $("classSaveBtn").textContent = it ? "Speichern" : "Hinzufügen";
+  classFiles = [];
+  $("cfFiles").value = "";
+  $("classFileQueue").innerHTML = "";
+  if ($("cfLinks")) $("cfLinks").value = "";
+  renderChips("classChips", "cfSubject");
+  showSheet("classSheet", "classScrim");
+}
+$("addClassBtn").onclick = () => openClassSheet(null);
+$("classCancelBtn").onclick = () => hideSheet("classSheet", "classScrim");
+$("classScrim").onclick = () => hideSheet("classSheet", "classScrim");
+$("cfFiles").onchange = () => {
+  classFiles = Array.from($("cfFiles").files || []);
+  const q = $("classFileQueue"); q.innerHTML = "";
+  classFiles.forEach(f => {
+    const d = document.createElement("div");
+    d.textContent = `${f.name} (${fmtSize(f.size)})`;
+    if (f.size > MAX_BYTES) d.style.color = "var(--red)";
+    q.appendChild(d);
+  });
+};
+$("classDelBtn").onclick = async () => {
+  if (!classEditingId || !confirm("Diese Klassen-HÜ wirklich löschen?")) return;
+  const title = classItems.find(i => i.id === classEditingId)?.title || "";
+  const { error } = await sb.from(CLASS_TABLE).delete().eq("id", classEditingId);
+  if (error) { toast("Löschen fehlgeschlagen."); return; }
+  classItems = classItems.filter(i => i.id !== classEditingId);
+  await logActivity("delete_class", title);
+  hideSheet("classSheet", "classScrim");
+  renderClass();
+  toast("Gelöscht.");
+};
+$("classSaveBtn").onclick = async () => {
+  if (saving) return;
+  if (!canWriteClass()) { toast("Kein Schreibrecht."); return; }
+  const title = $("cfTitle").value.trim();
+  if (!title) { toast("Bitte eine Aufgabe eingeben."); return; }
+  if (classFiles.some(f => f.size > MAX_BYTES)) { toast("Eine Datei ist größer als 10 GB."); return; }
+  saving = true; $("classSaveBtn").disabled = true; $("classSaveBtn").textContent = "Speichern …";
+  try {
+    if (classEditingId) {
+      const payload = { title, subject: $("cfSubject").value.trim(), due: $("cfDue").value || null, note: $("cfNote").value.trim() };
+      const { error } = await sb.from(CLASS_TABLE).update(payload).eq("id", classEditingId);
+      if (error) throw error;
+      const idx = classItems.findIndex(i => i.id === classEditingId);
+      if (idx >= 0) classItems[idx] = { ...classItems[idx], ...payload };
+      if (classFiles.length) await uploadFiles(classFiles, "class", null, classEditingId);
+      if ($("cfLinks")?.value.trim()) await saveLinksFor({ class_hu_id: classEditingId }, $("cfLinks").value);
+      await logActivity("update_class", title);
+      hideSheet("classSheet", "classScrim");
+      renderClass();
+      toast("Gespeichert.");
+    } else {
+      const payload = {
+        title,
+        subject: $("cfSubject").value.trim(),
+        due: $("cfDue").value || null,
+        note: $("cfNote").value.trim(),
+        created_by: user.id,
+        created_by_email: user.email,
+        created_by_name: toName(user.email)
+      };
+      const { data, error } = await sb.from(CLASS_TABLE).insert(payload).select().single();
+      if (error) throw error;
+      classItems.unshift(data);
+      if (classFiles.length) await uploadFiles(classFiles, "class", null, data.id);
+      if ($("cfLinks")?.value.trim()) await saveLinksFor({ class_hu_id: data.id }, $("cfLinks").value);
+      await logActivity("create_class", title);
+      hideSheet("classSheet", "classScrim");
+      renderClass();
+      toast("Klassen-HÜ hinzugefügt.");
+      try {
+        await callNotifyFunction("send-class-notification", {
+          title: "Neue Klassen-HÜ",
+          body: `${toName(user.email)} hat „${title}“ hinzugefügt.`,
+          tag: "class-hu"
+        });
+      } catch (e) { console.warn("Notify", e); }
+    }
+    haptic(15);
+  } catch (e) { toast("Fehler: " + (e.message || e)); }
+  finally { saving = false; $("classSaveBtn").disabled = false; $("classSaveBtn").textContent = classEditingId ? "Speichern" : "Hinzufügen"; }
+};
+
+
+/* ─── Unterlagen / SÜ ─── */
+async function loadUnterlagen() {
+  const listEl = $("suList");
+  if (!listEl) return;
+  const { data, error } = await sb.from(SU_TABLE).select("*").order("lesson_date", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
+  if (error) { console.warn(error); toast("Unterlagen konnten nicht geladen werden."); return; }
+  suItems = data || [];
+  renderUnterlagen();
+}
+function renderUnterlagen() {
+  const list = $("suList"), empty = $("suEmpty");
+  if (!list) return;
+  list.innerHTML = "";
+  if (!suItems.length) {
+    empty.hidden = false;
+    empty.innerHTML = "<h2>Noch keine Unterlagen</h2><p>Schulübungen aus dem Unterricht erscheinen hier.</p>";
+    return;
+  }
+  empty.hidden = true;
+  for (const it of suItems) {
+    const card = document.createElement("div");
+    card.className = "class-card";
+    const when = it.lesson_date
+      ? new Date(it.lesson_date + "T00:00:00").toLocaleDateString("de-AT", { weekday: "short", day: "numeric", month: "short" })
+      : "";
+    card.innerHTML = `
+      <div class="class-top">
+        <div>
+          <p class="subject">${esc(it.subject || "")}${when ? " · " + esc(when) : ""}</p>
+          <h3>${esc(it.title)}</h3>
+          ${it.note ? `<p class="note">${esc(it.note)}</p>` : ""}
+          <p class="added-by">Von ${esc(it.created_by_name || toName(it.created_by_email))}</p>
+        </div>
+      </div>
+      <div class="attachments" data-sufiles="${it.id}"></div>
+                  <div class="link-list" data-sulinks="${it.id}"></div>
+      <div class="class-actions">
+        ${(isAdmin() || it.created_by === user.id) ? `<button type="button" class="small-btn" data-suedit="${it.id}">Bearbeiten</button>` : ""}
+      </div>`;
+    list.appendChild(card);
+    loadExistingFiles(null, null, card.querySelector("[data-sufiles]"), it.id);
+            loadLinks({ unterlage_id: it.id }, card.querySelector("[data-sulinks]"));
+  }
+  list.querySelectorAll("[data-suedit]").forEach(btn => {
+    btn.onclick = () => {
+      const it = suItems.find(c => c.id === btn.dataset.suedit);
+      if (it) openSuSheet(it);
+    };
+  });
+}
+function openSuSheet(it) {
+  suEditingId = it ? it.id : null;
+  $("suSheetTitle").textContent = it ? "Schulübung bearbeiten" : "Schulübung hinzufügen";
+  $("suTitle").value = it?.title || "";
+  $("suSubject").value = it?.subject || "";
+  $("suDate").value = it?.lesson_date || todayISO();
+  $("suNote").value = it?.note || "";
+  $("suDelBtn").hidden = !it || !(isAdmin() || it.created_by === user.id);
+  $("suSaveBtn").textContent = it ? "Speichern" : "Hinzufügen";
+  suFiles = [];
+  $("suFiles").value = "";
+  $("suFileQueue").innerHTML = "";
+  renderChips("suChips", "suSubject");
+  showSheet("suSheet", "suScrim");
+}
+$("addSuBtn").onclick = () => openSuSheet(null);
+$("suCancelBtn").onclick = () => hideSheet("suSheet", "suScrim");
+$("suScrim").onclick = () => hideSheet("suSheet", "suScrim");
+$("suFiles").onchange = () => {
+  suFiles = Array.from($("suFiles").files || []);
+  const q = $("suFileQueue"); q.innerHTML = "";
+  suFiles.forEach(f => {
+    const d = document.createElement("div");
+    d.textContent = `${f.name} (${fmtSize(f.size)})`;
+    if (f.size > MAX_BYTES) d.style.color = "var(--red)";
+    q.appendChild(d);
+  });
+};
+$("suDelBtn").onclick = async () => {
+  if (!suEditingId || !confirm("Diese Schulübung wirklich löschen?")) return;
+  const title = suItems.find(i => i.id === suEditingId)?.title || "";
+  const { error } = await sb.from(SU_TABLE).delete().eq("id", suEditingId);
+  if (error) { toast("Löschen fehlgeschlagen."); return; }
+  suItems = suItems.filter(i => i.id !== suEditingId);
+  await logActivity("delete_su", title);
+  hideSheet("suSheet", "suScrim");
+  renderUnterlagen();
+  toast("Gelöscht.");
+};
+$("suSaveBtn").onclick = async () => {
+  if (saving) return;
+  if (!canWriteClass()) { toast("Kein SÜ-Schreibrecht."); return; }
+  const title = $("suTitle").value.trim();
+  if (!title) { toast("Bitte einen Titel eingeben."); return; }
+  if (suFiles.some(f => f.size > MAX_BYTES)) { toast("Eine Datei ist größer als 10 GB."); return; }
+  saving = true; $("suSaveBtn").disabled = true; $("suSaveBtn").textContent = "Speichern …";
+  try {
+    const payload = {
+      title,
+      subject: $("suSubject").value.trim(),
+      lesson_date: $("suDate").value || null,
+      note: $("suNote").value.trim()
+    };
+    if (suEditingId) {
+      const { error } = await sb.from(SU_TABLE).update(payload).eq("id", suEditingId);
+      if (error) throw error;
+      if (suFiles.length) await uploadFiles(suFiles, "unterlagen", null, null, suEditingId);
+      if ($("suLinks")?.value.trim()) await saveLinksFor({ unterlage_id: suEditingId }, $("suLinks").value);
+      await logActivity("update_su", title);
+      toast("Gespeichert.");
+    } else {
+      Object.assign(payload, {
+        created_by: user.id,
+        created_by_email: user.email,
+        created_by_name: toName(user.email)
+      });
+      const { data, error } = await sb.from(SU_TABLE).insert(payload).select().single();
+      if (error) throw error;
+      if (suFiles.length) await uploadFiles(suFiles, "unterlagen", null, null, data.id);
+      if ($("suLinks")?.value.trim()) await saveLinksFor({ unterlage_id: data.id }, $("suLinks").value);
+      await logActivity("create_su", title);
+      toast("Schulübung gepostet.");
+      try {
+        await callNotifyFunction("send-class-notification", {
+          title: "Neue Schulübung",
+          body: `${toName(user.email)} hat „${title}“ in Unterlagen gepostet.`,
+          tag: "unterlagen-su"
+        });
+      } catch (e) { console.warn("Notify", e); }
+    }
+    hideSheet("suSheet", "suScrim");
+    await loadUnterlagen();
+    haptic(15);
+  } catch (e) { toast("Fehler: " + (e.message || e)); }
+  finally { saving = false; $("suSaveBtn").disabled = false; $("suSaveBtn").textContent = suEditingId ? "Speichern" : "Hinzufügen"; }
+};
+
+/* ─── Week overview ─── */
+function renderWeek() {
+  const content = $("weekContent"), empty = $("weekEmpty");
+  content.innerHTML = "";
+  const today = new Date(todayISO() + "T00:00:00");
+  const end = new Date(today); end.setDate(end.getDate() + (7 - today.getDay() + 1) % 7 || 7); // bis Sonntag
+  const endISO = end.getFullYear() + "-" + String(end.getMonth()+1).padStart(2,"0") + "-" + String(end.getDate()).padStart(2,"0");
+
+  const days = {};
+  const addItem = (iso, title, subject, kind) => {
+    if (!iso || iso < todayISO() || iso > endISO) return;
+    if (!days[iso]) days[iso] = [];
+    days[iso].push({ title, subject, kind });
+  };
+  items.filter(i => !i.done).forEach(i => addItem(i.due, i.title, i.subject, "persönlich"));
+  classItems.filter(c => !classDone.has(c.id)).forEach(c => addItem(c.due, c.title, c.subject, "Klasse"));
+
+  const keys = Object.keys(days).sort();
+  if (!keys.length) {
+    empty.hidden = false;
+    empty.innerHTML = "<h2>Nichts mehr diese Woche</h2><p>Alle offenen HÜ liegen später oder sind erledigt.</p>";
+    return;
+  }
+  empty.hidden = true;
+  for (const iso of keys) {
+    const label = dueLabel(iso) || iso;
+    const card = document.createElement("div");
+    card.className = "week-card";
+    const lis = days[iso].map(x => `<li><strong>${esc(x.subject || "–")}</strong>: ${esc(x.title)} <span style="color:var(--ink-3)">(${x.kind})</span></li>`).join("");
+    card.innerHTML = `<h4>${esc(label)}</h4><ul>${lis}</ul>`;
+    content.appendChild(card);
+  }
+}
+
+
+async function loadSolutions(classHuId, container) {
+  if (!container || !classHuId) return;
+  const { data, error } = await sb.from(SOL_TABLE)
+    .select("id,name,size,path,mime_type,owner_name,owner_email,owner_id,created_at")
+    .eq("class_hu_id", classHuId)
+    .order("created_at", { ascending: false });
+  container.innerHTML = "";
+  if (error) { container.innerHTML = '<span class="field-help">Lösungen nicht ladbar</span>'; return; }
+  if (!data?.length) {
+    container.innerHTML = '<span class="field-help">Noch keine Lösungen</span>';
+    return;
+  }
+  for (const f of data) {
+    const row = document.createElement("div");
+    row.className = "solution-row";
+    const who = f.owner_name || toName(f.owner_email) || "?";
+    const openBtn = document.createElement("button");
+    openBtn.type = "button";
+    openBtn.className = "file-link";
+    openBtn.textContent = `${f.name} (${fmtSize(f.size)})`;
+    openBtn.onclick = () => openPreview(f);
+    const meta = document.createElement("span");
+    meta.className = "solution-by";
+    meta.textContent = `von ${who}`;
+    row.appendChild(openBtn);
+    row.appendChild(meta);
+    if (isAdmin() || f.owner_id === user.id) {
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "small-btn";
+      del.textContent = "×";
+      del.title = "Lösung löschen";
+      del.onclick = async () => {
+        if (!confirm("Lösung löschen?")) return;
+        const { error: e2 } = await sb.from(SOL_TABLE).delete().eq("id", f.id);
+        if (e2) { toast("Löschen fehlgeschlagen."); return; }
+        try { await sb.storage.from("hu-files").remove([f.path]); } catch {}
+        await loadSolutions(classHuId, container);
+      };
+      row.appendChild(del);
+    }
+    container.appendChild(row);
+  }
+}
+async function uploadSolutions(files, classHuId) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) throw new Error("Nicht angemeldet");
+  for (const raw of files) {
+    if (raw.size > MAX_BYTES) throw new Error("Datei zu groß (max. 10 GB).");
+    const file = await asBrowserBlob(raw);
+    const path = `solutions/${classHuId}/${crypto.randomUUID()}_${safeName(raw.name || "lösung")}`;
+    const { error: upErr } = await sb.storage.from("hu-files").upload(path, file, {
+      contentType: file.type || "application/octet-stream",
+      upsert: false
+    });
+    if (upErr) throw upErr;
+    const { error } = await sb.from(SOL_TABLE).insert({
+      class_hu_id: classHuId,
+      owner_id: user.id,
+      owner_name: toName(user.email),
+      owner_email: user.email,
+      name: raw.name || "lösung",
+      size: raw.size || 0,
+      mime_type: raw.type || "application/octet-stream",
+      path
+    });
+    if (error) throw error;
+  }
+}
+
+/* ─── Files + Preview ─── */
+async function asBrowserBlob(file) {
+  const type = file.type || "application/octet-stream";
+  const buf = await file.arrayBuffer();
+  const blob = new Blob([buf], { type });
+  blob.name = file.name || "datei";
+  return blob;
+}
+async function saveFileRow(file, hausuebungId, classHuId, path, unterlageId) {
+  const { error } = await sb.from(FILE_TABLE).insert({
+    owner_id: user.id,
+    hausuebung_id: hausuebungId || null,
+    class_hu_id: classHuId || null,
+    unterlage_id: unterlageId || null,
+    name: file.name || "datei",
+    size: file.size || 0,
+    mime_type: file.type || "application/octet-stream",
+    path
+  });
+  if (error) throw error;
+}
+async function uploadFiles(files, kind, hausuebungId, classHuId, unterlageId) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) throw new Error("Nicht angemeldet");
+  for (const raw of files) {
+    const file = await asBrowserBlob(raw);
+    const folder = kind === "personal" ? `personal/${user.id}` : (kind === "unterlagen" ? "unterlagen" : "class");
+    const path = `${folder}/${crypto.randomUUID()}_${safeName(raw.name || file.name || "datei")}`;
+    const small = (raw.size || file.size || 0) < 50 * 1024 * 1024;
+    if (small) {
+      const { error } = await sb.storage.from("hu-files").upload(path, file, {
+        contentType: file.type || "application/octet-stream",
+        upsert: false
+      });
+      if (error) throw error;
+      await saveFileRow(raw, hausuebungId, classHuId, path, unterlageId);
+      continue;
+    }
+    await new Promise((resolve, reject) => {
+      const upload = new tus.Upload(file, {
+        endpoint: tusEndpoint,
+        retryDelays: [0, 1000, 3000, 5000, 10000],
+        headers: { authorization: `Bearer ${session.access_token}`, "x-upsert": "false" },
+        uploadDataDuringCreation: true,
+        removeFingerprintOnSuccess: true,
+        metadata: {
+          bucketName: "hu-files",
+          objectName: path,
+          contentType: file.type || "application/octet-stream",
+          cacheControl: "3600"
+        },
+        chunkSize: 6 * 1024 * 1024,
+        onError: reject,
+        onSuccess: async () => {
+          try { await saveFileRow(raw, hausuebungId, classHuId, path, unterlageId); resolve(); }
+          catch (e) { reject(e); }
+        }
+      });
+      upload.findPreviousUploads().then(prev => {
+        if (prev.length) upload.resumeFromPreviousUpload(prev[0]);
+        upload.start();
+      }).catch(reject);
+    });
+  }
+}
+async function loadExistingFiles(hausuebungId, classHuId, container, unterlageId) {
+  if (typeof container === "string") container = $(container);
+  if (!container) return;
+  let q = sb.from(FILE_TABLE).select("id,name,size,path,mime_type");
+  if (hausuebungId) q = q.eq("hausuebung_id", hausuebungId);
+  else if (unterlageId) q = q.eq("unterlage_id", unterlageId);
+  else q = q.eq("class_hu_id", classHuId);
+  const { data } = await q;
+  container.innerHTML = "";
+  if (!data?.length) return;
+  for (const f of data) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "file-link";
+    btn.textContent = `${f.name} (${fmtSize(f.size)})`;
+    btn.onclick = () => openPreview(f);
+    container.appendChild(btn);
+  }
+}
+async function openPreview(f) {
+  if (!f?.path) { toast("Vorschau: kein Dateipfad."); return; }
+  const { data: signed, error } = await sb.storage.from("hu-files").createSignedUrl(f.path, 3600);
+  if (error || !signed?.signedUrl) {
+    console.warn("preview", error, f.path);
+    toast("Vorschau fehlgeschlagen" + (error?.message ? ": " + error.message : ". Storage-Rechte prüfen (fix-storage-preview.sql)."));
+    return;
+  }
+  const url = signed.signedUrl;
+  const root = $("previewRoot");
+  root.hidden = false;
+  root.innerHTML = "";
+  const scrim = document.createElement("div");
+  scrim.className = "preview-scrim";
+  const box = document.createElement("div");
+  box.className = "preview-box";
+  const close = document.createElement("button");
+  close.type = "button"; close.className = "preview-close"; close.textContent = "Schließen";
+  close.onclick = () => { root.hidden = true; root.innerHTML = ""; };
+  box.appendChild(close);
+  const mime = (f.mime_type || "").toLowerCase();
+  const name = (f.name || "").toLowerCase();
+  if (mime.startsWith("image/") || /\.(png|jpe?g|gif|webp|svg)$/.test(name)) {
+    const img = document.createElement("img"); img.src = url; img.alt = f.name; box.appendChild(img);
+  } else if (mime === "application/pdf" || name.endsWith(".pdf")) {
+    const iframe = document.createElement("iframe"); iframe.src = url; box.appendChild(iframe);
+  } else if (mime.startsWith("text/") || /\.(txt|md|csv|json|log|xml|html|css|js|ts)$/.test(name)) {
+    try {
+      const res = await fetch(url);
+      const text = await res.text();
+      const pre = document.createElement("pre"); pre.textContent = text.slice(0, 100000); box.appendChild(pre);
+    } catch {
+      const a = document.createElement("a"); a.href = url; a.target = "_blank"; a.textContent = "Datei öffnen / downloaden"; box.appendChild(a);
+    }
+  } else {
+    const a = document.createElement("a"); a.href = url; a.target = "_blank"; a.rel = "noopener";
+    a.textContent = "Download / Öffnen: " + f.name; box.appendChild(a);
+  }
+  scrim.appendChild(box);
+  scrim.onclick = e => { if (e.target === scrim) { root.hidden = true; root.innerHTML = ""; } };
+  root.appendChild(scrim);
+}
+
+/* ─── Sheets ─── */
+function showSheet(sheetId, scrimId) {
+  const s = $(sheetId), c = $(scrimId);
+  s.hidden = false; c.hidden = false;
+  requestAnimationFrame(() => { s.classList.add("open"); c.classList.add("open"); });
+}
+function hideSheet(sheetId, scrimId) {
+  const s = $(sheetId), c = $(scrimId);
+  s.classList.remove("open"); c.classList.remove("open");
+  setTimeout(() => { s.hidden = true; c.hidden = true; }, 300);
+}
+
+/* ─── Realtime ─── */
+function subscribeAll() {
+  channels.forEach(c => sb.removeChannel(c));
+  channels = [];
+  channels.push(sb.channel("personal-hu").on("postgres_changes", { event: "*", schema: "public", table: TABLE }, () => loadPersonal()).subscribe());
+  channels.push(sb.channel("class-hu").on("postgres_changes", { event: "*", schema: "public", table: CLASS_TABLE }, () => loadClass()).subscribe());
+  channels.push(sb.channel("unterlagen").on("postgres_changes", { event: "*", schema: "public", table: SU_TABLE }, () => loadUnterlagen()).subscribe());
+  channels.push(sb.channel("perms").on("postgres_changes", { event: "*", schema: "public", table: PERM_TABLE }, () => loadPermissions()).subscribe());
+}
+
+/* ─── Tabs ─── */
+document.querySelectorAll(".main-tabs button").forEach(b => {
+  b.onclick = () => setMainView(b.dataset.view);
+});
+window.addEventListener("hashchange", () => applyHashRoute());
+$("nfHome")?.addEventListener("click", () => {
+  hideNotFound();
+  if (user) setMainView("personal");
+  else { location.hash = "#/"; showAuth(); }
+});
+
+$("today").textContent = new Date().toLocaleDateString("de-AT", { weekday: "long", day: "numeric", month: "long" });
+
+// Ban hat Vorrang vor Login/Session → direkt Ban-Screen
+const bannedAtStart = await checkIpBanOnStart();
+if (bannedAtStart) {
+  // Session ggf. beenden, damit gebannte IPs nicht in der App landen
+  try { await sb.auth.signOut(); } catch {}
+  user = null;
+} else {
+  const { data: { session: first } } = await sb.auth.getSession();
+  if (first) await showApp(first);
+  else showAuth();
+}
+</script>
+</body>
+</html>

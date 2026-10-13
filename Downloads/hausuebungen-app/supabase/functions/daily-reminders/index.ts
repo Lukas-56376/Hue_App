@@ -16,32 +16,58 @@ function json(data: unknown, status = 200) {
   return Response.json(data, { status, headers: cors });
 }
 
-function weekendNow() {
-  const fmt = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Vienna", weekday: "short" });
-  const wd = fmt.format(new Date()); // Sat, Sun, Mon, ...
-  return wd === "Sat" || wd === "Sun";
+function viennaParts(d = new Date()) {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Vienna",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false
+  });
+  const parts = fmt.formatToParts(d);
+  const get = (t: string) => parts.find(p => p.type === t)?.value || "";
+  return {
+    date: `${get("year")}-${get("month")}-${get("day")}`,
+    weekday: get("weekday"),
+    hour: Number(get("hour")),
+    minute: Number(get("minute"))
+  };
 }
 
-function nextSchoolDayISO() {
-  const fmt = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Vienna", year: "numeric", month: "2-digit", day: "2-digit", weekday: "short"
-  });
-  const d = new Date();
-  for (let i = 1; i <= 4; i++) {
-    const candidate = new Date(d.getTime() + i * 24 * 60 * 60 * 1000);
-    const parts = fmt.formatToParts(candidate);
-    const get = (t: string) => parts.find(p => p.type === t)!.value;
-    const wd = get("weekday");
-    if (wd !== "Sat" && wd !== "Sun") return `${get("year")}-${get("month")}-${get("day")}`;
+function addDaysISO(iso: string, days: number) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
+function isWeekendISO(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return wd === 0 || wd === 6;
+}
+
+/** Nächster Schultag relativ zu baseISO (exklusiv heute wenn daysAhead=1 vom Kalender) */
+function schoolDayFrom(baseISO: string, offsetSchoolDays: number) {
+  let cur = baseISO;
+  let left = offsetSchoolDays;
+  while (left > 0) {
+    cur = addDaysISO(cur, 1);
+    if (!isWeekendISO(cur)) left--;
   }
-  const t = new Date(d.getTime() + 24 * 60 * 60 * 1000);
-  const parts = fmt.formatToParts(t);
-  const get = (x: string) => parts.find(p => p.type === x)!.value;
-  return `${get("year")}-${get("month")}-${get("day")}`;
+  return cur;
+}
+
+function timeMatches(remindTime: string, hour: number, minute: number, force: boolean) {
+  if (force) return true;
+  // remind_time "HH:MM:SS" or "HH:MM"
+  const [h, mi] = String(remindTime || "10:00").split(":").map(Number);
+  return hour === h && minute >= (mi || 0) && minute < (mi || 0) + 60;
 }
 
 Deno.serve(async req => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+
+  const body = await req.json().catch(() => ({}));
+  const force = !!body.force; // Admin-Test: alle Stufen/Zeiten
 
   const cronOk = req.headers.get("x-cron-secret") === Deno.env.get("CRON_SECRET");
   let adminOk = false;
@@ -49,7 +75,7 @@ Deno.serve(async req => {
   if (!cronOk && auth) {
     const token = auth.replace(/^Bearer\s+/i, "");
     const { data: { user } } = await supabase.auth.getUser(token);
-    adminOk = ["daweed@lukio.site","nico@lukio.site"].includes((user?.email || "").toLowerCase());
+    adminOk = ["daweed@lukio.site", "nico@lukio.site"].includes((user?.email || "").toLowerCase());
   }
   if (!cronOk && !adminOk) return json({ error: "Unauthorized" }, 401);
 
@@ -60,51 +86,132 @@ Deno.serve(async req => {
       Deno.env.get("VAPID_PRIVATE_KEY")!
     );
 
-    const target = nextSchoolDayISO();
-    const [{ data: personal }, { data: classHu }, { data: completions }, { data: subs }] = await Promise.all([
-      supabase.from("hausuebungen").select("user_id,title").eq("due", target).eq("done", false),
-      supabase.from("klassen_huebungen").select("id,title").eq("due", target),
-      supabase.from("class_hu_completions").select("class_hu_id,user_id").eq("done", true),
+    const now = viennaParts();
+    const today = now.date;
+
+    const [
+      { data: settings },
+      { data: personal },
+      { data: classHu },
+      { data: completions },
+      { data: subs }
+    ] = await Promise.all([
+      supabase.from("user_settings").select("*"),
+      supabase.from("hausuebungen").select("id,user_id,title,due,done"),
+      supabase.from("klassen_huebungen").select("id,title,due"),
+      supabase.from("class_hu_completions").select("class_hu_id,user_id,done"),
       supabase.from("push_subscriptions").select("id,user_id,subscription")
     ]);
 
-    const personalByUser = new Map<string, string[]>();
-    for (const h of personal || []) {
-      const arr = personalByUser.get(h.user_id) || [];
-      arr.push(h.title);
-      personalByUser.set(h.user_id, arr);
-    }
+    const settingsByUser = new Map((settings || []).map(s => [s.user_id, s]));
+    const defaultSettings = {
+      notify_enabled: true,
+      notify_class: true,
+      notify_personal: true,
+      remind_time: "10:00",
+      stage_2d: false,
+      stage_1d: true,
+      stage_0d: false
+    };
 
     let sent = 0;
-    for (const sub of subs || []) {
-      const own = personalByUser.get(sub.user_id) || [];
-      const completed = new Set((completions || []).filter(x => x.user_id === sub.user_id).map(x => x.class_hu_id));
-      const classTitles = (classHu || []).filter(x => !completed.has(x.id)).map(x => x.title);
-      const count = own.length + classTitles.length;
-      if (!count) continue;
+    const users = new Set((subs || []).map(s => s.user_id));
 
-      const titles = [...own, ...classTitles].slice(0, 3);
-      const when = weekendNow() ? "Montag" : "morgen";
-      const body = count === 1
-        ? `${when === "Montag" ? "Montag" : "Morgen"} fällig: ${titles[0]}`
-        : `${count} Hausübungen für ${when === "Montag" ? "Montag" : "den nächsten Schultag"}: ${titles.join(", ")}${count > 3 ? " …" : ""}`;
+    for (const userId of users) {
+      const st = { ...defaultSettings, ...(settingsByUser.get(userId) || {}) };
+      if (!st.notify_enabled) continue;
+      if (!timeMatches(st.remind_time, now.hour, now.minute, force)) continue;
 
-      try {
-        await webpush.sendNotification(sub.subscription, JSON.stringify({
-          title: "Erinnerung: Hausübungen",
-          body,
-          tag: "daily-hu-reminder",
-          url: "./"
-        }));
-        sent++;
-      } catch (e) {
-        const status = Number((e as { statusCode?: number })?.statusCode);
-        if (status === 404 || status === 410) {
-          await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+      const stages: { key: string; due: string; label: string }[] = [];
+      if (st.stage_2d) {
+        stages.push({ key: "2d", due: schoolDayFrom(today, 2), label: "in 2 Tagen" });
+      }
+      if (st.stage_1d) {
+        const due = schoolDayFrom(today, 1);
+        const weekend = isWeekendISO(addDaysISO(today, 1)) || isWeekendISO(addDaysISO(today, 2));
+        stages.push({
+          key: "1d",
+          due,
+          label: weekend && due > addDaysISO(today, 1) ? "Montag" : "morgen"
+        });
+      }
+      if (st.stage_0d) {
+        stages.push({ key: "0d", due: today, label: "heute" });
+      }
+
+      for (const stage of stages) {
+        const titles: string[] = [];
+        const keys: string[] = [];
+
+        if (st.notify_personal) {
+          for (const h of personal || []) {
+            if (h.user_id !== userId || h.done || h.due !== stage.due) continue;
+            const itemKey = `p:${h.id}`;
+            const { data: already } = await supabase.from("reminder_sent")
+              .select("id").eq("user_id", userId).eq("item_key", itemKey)
+              .eq("stage", stage.key).eq("sent_on", today).maybeSingle();
+            if (already && !force) continue;
+            titles.push(h.title);
+            keys.push(itemKey);
+          }
+        }
+
+        if (st.notify_class) {
+          const completed = new Set(
+            (completions || [])
+              .filter(c => c.user_id === userId && c.done)
+              .map(c => c.class_hu_id)
+          );
+          for (const c of classHu || []) {
+            if (c.due !== stage.due || completed.has(c.id)) continue;
+            const itemKey = `c:${c.id}`;
+            const { data: already } = await supabase.from("reminder_sent")
+              .select("id").eq("user_id", userId).eq("item_key", itemKey)
+              .eq("stage", stage.key).eq("sent_on", today).maybeSingle();
+            if (already && !force) continue;
+            titles.push(c.title);
+            keys.push(itemKey);
+          }
+        }
+
+        if (!titles.length) continue;
+
+        const bodyText = titles.length === 1
+          ? `${stage.label === "morgen" ? "Morgen" : stage.label === "heute" ? "Heute" : stage.label} fällig: ${titles[0]}`
+          : `${titles.length} HÜ (${stage.label}): ${titles.slice(0, 3).join(", ")}${titles.length > 3 ? " …" : ""}`;
+
+        const userSubs = (subs || []).filter(s => s.user_id === userId);
+        for (const sub of userSubs) {
+          try {
+            await webpush.sendNotification(sub.subscription, JSON.stringify({
+              title: "Erinnerung: Hausübungen",
+              body: bodyText,
+              tag: `daily-hu-${stage.key}`,
+              url: "./#/"
+            }));
+            sent++;
+          } catch (e) {
+            const status = Number((e as { statusCode?: number })?.statusCode);
+            if (status === 404 || status === 410) {
+              await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+            }
+          }
+        }
+
+        if (!force) {
+          for (const itemKey of keys) {
+            await supabase.from("reminder_sent").upsert({
+              user_id: userId,
+              item_key: itemKey,
+              stage: stage.key,
+              sent_on: today
+            }, { onConflict: "user_id,item_key,stage,sent_on", ignoreDuplicates: true });
+          }
         }
       }
     }
-    return json({ date: target, sent });
+
+    return json({ date: today, hour: now.hour, sent, force });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }

@@ -505,3 +505,177 @@ textarea { resize: vertical; min-height: 72px; }
   display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px;
   vertical-align: middle;
 }
+
+
+/* ── Ban screen ── */
+#banScreen {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: radial-gradient(ellipse at 50% 20%, rgba(200,50,50,.12), transparent 55%),
+              var(--paper, #0b0b0b);
+}
+#banScreen[hidden] { display: none !important; }
+.ban-wrap {
+  width: min(420px, 100%);
+  text-align: center;
+}
+.ban-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #f87171;
+  background: rgba(200,50,50,.12);
+  border: 1px solid rgba(200,50,50,.35);
+  margin-bottom: 18px;
+}
+.ban-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+}
+.ban-icon {
+  font-size: 56px;
+  line-height: 1;
+  color: #ef4444;
+  margin: 8px 0 16px;
+  filter: drop-shadow(0 0 20px rgba(239,68,68,.35));
+}
+.ban-title {
+  font-family: "Bricolage Grotesque", system-ui, sans-serif;
+  font-size: clamp(1.6rem, 5vw, 2rem);
+  font-weight: 700;
+  margin: 0 0 10px;
+  color: var(--ink);
+}
+.ban-title span { color: #ef4444; }
+.ban-sub {
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 22px;
+}
+.ban-card {
+  text-align: left;
+  background: var(--card-bg, #161616);
+  border: 1px solid var(--rule, #2a2a2a);
+  border-radius: 14px;
+  padding: 4px 16px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+}
+.ban-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule, #2a2a2a);
+  font-size: 13px;
+}
+.ban-row:last-child { border-bottom: 0; }
+.ban-k { color: var(--ink-3); display: flex; align-items: center; gap: 6px; }
+.ban-v { color: var(--ink); font-weight: 500; text-align: right; }
+.ban-permanent { color: #f87171; }
+.ban-back {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--rule);
+  background: var(--soft);
+  color: var(--ink);
+  font-weight: 600;
+  cursor: pointer;
+}
+.ban-back:hover { filter: brightness(1.08); }
+.ban-foot {
+  margin-top: 18px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+/* 404 */
+#notFoundScreen {
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: var(--paper);
+}
+#notFoundScreen[hidden] { display: none !important; }
+.nf-wrap { width: min(420px, 100%); text-align: center; }
+.nf-code {
+  font-family: "Bricolage Grotesque", system-ui, sans-serif;
+  font-size: clamp(4rem, 18vw, 6rem);
+  font-weight: 700;
+  margin: 0;
+  line-height: 1;
+  letter-spacing: -.04em;
+  background: linear-gradient(135deg, var(--green), #5eead4);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.nf-title {
+  font-family: "Bricolage Grotesque", system-ui, sans-serif;
+  font-size: 1.5rem;
+  margin: 12px 0 8px;
+}
+.nf-sub { color: var(--ink-2); font-size: 14px; line-height: 1.55; margin: 0 0 22px; }
+.nf-sub code {
+  font-size: 12px;
+  background: var(--soft);
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--rule);
+}
+
+/* Settings */
+.settings-tabs { display: flex; gap: 6px; margin: 0 0 14px; flex-wrap: wrap; }
+.set-tab {
+  border: 1px solid var(--rule); background: var(--soft); color: var(--ink-2);
+  border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.set-tab[aria-selected="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.check-row { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; }
+.check-row input { width: 18px; height: 18px; }
+
+/* Links */
+.link-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.link-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 999px; font-size: 12.5px;
+  background: var(--soft); border: 1px solid var(--rule); color: var(--ink);
+  text-decoration: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.link-chip:hover { border-color: var(--green); color: var(--green); }
+
+/* Comments */
+.comments-block {
+  margin: 10px 0 0; padding: 10px; border-radius: 12px;
+  background: color-mix(in srgb, var(--soft) 80%, transparent);
+  border: 1px solid var(--rule);
+}
+.comment-row {
+  position: relative; padding: 8px 28px 8px 0;
+  border-bottom: 1px solid var(--rule); font-size: 13.5px;
+}
+.comment-row:last-of-type { border-bottom: 0; }
+.comment-meta { color: var(--ink-3); font-size: 12px; margin-bottom: 2px; }
+.comment-body { color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+.comment-row .small-btn { position: absolute; right: 0; top: 6px; padding: 2px 8px; }
+.comment-form { display: flex; gap: 8px; margin-top: 10px; }
+.comment-form input {
+  flex: 1; border: 1px solid var(--rule); border-radius: 10px;
+  background: var(--paper); padding: 8px 10px; color: var(--ink);
+}
+
+body.banned { overflow: hidden; }
