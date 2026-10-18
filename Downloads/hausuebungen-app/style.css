@@ -294,8 +294,20 @@ h1.page, #auth h1 {
 [data-theme="dark"] .row.done { background: #161617; }
 .row.done .title { text-decoration: line-through; color: var(--ink-3); }
 .row.important { box-shadow: inset 3px 0 0 var(--important-border), inset 0 0 0 1px var(--rule); }
-.row.overdue { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red) 45%, var(--rule)); }
-.row.due-today { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--orange) 50%, var(--rule)); }
+.row.overdue, .class-card.overdue {
+  box-shadow: inset 3px 0 0 var(--red), inset 0 0 0 1px color-mix(in srgb, var(--red) 35%, var(--rule));
+}
+.row.due-today, .class-card.due-today {
+  box-shadow: inset 3px 0 0 var(--orange), inset 0 0 0 1px color-mix(in srgb, var(--orange) 40%, var(--rule));
+}
+.row.due-tomorrow, .class-card.due-tomorrow {
+  box-shadow: inset 3px 0 0 var(--yellow), inset 0 0 0 1px color-mix(in srgb, var(--yellow) 35%, var(--rule));
+}
+.row.done, .class-card.done {
+  box-shadow: inset 3px 0 0 var(--green-fill);
+}
+.due.today { color: var(--orange); font-weight: 600; }
+.due.soon { color: var(--yellow); font-weight: 600; }
 .drag-handle { color: var(--ink-3); cursor: grab; font-size: 16px; }
 .row.dragging { opacity: 0.55; }
 .box {
@@ -441,15 +453,68 @@ h1.page, #auth h1 {
 }
 .field { margin: 14px 0; }
 .field label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-3); margin-bottom: 6px; }
-input[type="text"], input[type="password"], input[type="search"], input[type="date"], input[type="time"], input[type="file"], textarea, select {
+input[type="text"], input[type="password"], input[type="search"], input[type="date"], input[type="time"], input[type="url"], input[type="email"], input[type="number"], input[type="file"], textarea, select {
   width: 100%;
   border: 0;
-  background: var(--paper);
+  background: var(--elevated);
+  color: var(--ink);
   border-radius: 12px;
   padding: 12px 14px;
   box-shadow: inset 0 0 0 1px var(--input-border);
+  -webkit-text-fill-color: var(--ink);
+  caret-color: var(--ink);
+}
+input::placeholder, textarea::placeholder {
+  color: var(--ink-3);
+  opacity: 1;
+  -webkit-text-fill-color: var(--ink-3);
 }
 textarea { min-height: 96px; resize: vertical; }
+.fmt-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.fmt-bar button {
+  border: 0;
+  background: var(--chip-bg);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--input-border);
+}
+.fmt-bar button:active { opacity: 0.75; }
+.fmt-bar button i { font-style: italic; font-weight: 500; }
+.md-body { font-size: 15px; line-height: 1.5; color: var(--ink-2); }
+.md-body strong { color: var(--ink); font-weight: 600; }
+.md-body em { font-style: italic; }
+.md-body ul { margin: 6px 0 0 1.1em; padding: 0; }
+.md-body li { margin: 2px 0; }
+.md-body a { color: var(--blue); text-decoration: none; }
+.md-body .md-line { display: block; }
+.note.md-body { margin-top: 8px; }
+.file-queue-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-top: 6px;
+  border-radius: 10px;
+  background: var(--chip-bg);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.file-queue-item button {
+  border: 0;
+  background: transparent;
+  color: var(--red);
+  font-size: 14px;
+  padding: 4px 8px;
+}
 .check-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; font-size: 15px; }
 .actions, .auth-actions { display: flex; gap: 16px; align-items: center; justify-content: flex-end; margin-top: 18px; }
 .save, .btn-primary, .cancel, .del, .btn-secondary, .ban-back {

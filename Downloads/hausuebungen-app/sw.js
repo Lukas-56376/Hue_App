@@ -1,4 +1,4 @@
-const CACHE = "hu-shell-v2";
+const CACHE = "hu-shell-v4";
 const SHELL = ["./", "./index.html", "./style.css", "./config.js", "./manifest.json", "./icon.jpg"];
 
 self.addEventListener("install", event => {
@@ -21,18 +21,28 @@ self.addEventListener("fetch", event => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
+  const isShell = url.pathname.endsWith(".html") || url.pathname === "/" || url.pathname.endsWith("/") ||
+    url.pathname.endsWith(".css") || url.pathname.endsWith(".js");
   event.respondWith(
-    caches.match(req).then(cached => {
-      const network = fetch(req).then(res => {
-        if (res && res.ok && (url.pathname.endsWith(".html") || url.pathname.endsWith(".css") ||
-            url.pathname.endsWith(".js") || url.pathname.endsWith(".json") || url.pathname.endsWith(".jpg"))) {
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
-        }
-        return res;
-      }).catch(() => cached);
-      return cached || network;
-    })
+    (isShell
+      ? fetch(req).then(res => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+          }
+          return res;
+        }).catch(() => caches.match(req))
+      : caches.match(req).then(cached => {
+          const network = fetch(req).then(res => {
+            if (res && res.ok && (url.pathname.endsWith(".json") || url.pathname.endsWith(".jpg"))) {
+              const copy = res.clone();
+              caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+            }
+            return res;
+          }).catch(() => cached);
+          return cached || network;
+        })
+    )
   );
 });
 

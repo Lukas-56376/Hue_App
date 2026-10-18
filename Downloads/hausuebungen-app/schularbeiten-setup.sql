@@ -1,4 +1,4 @@
--- Tests & Schularbeiten
+-- Tests & Schularbeiten (RLS ueber is_hu_admin)
 create table if not exists public.schularbeiten (
   id uuid primary key default gen_random_uuid(),
   title text not null,
@@ -28,46 +28,21 @@ drop policy if exists "schularbeiten_insert_admin" on public.schularbeiten;
 create policy "schularbeiten_insert_admin"
   on public.schularbeiten for insert
   to authenticated
-  with check (
-    lower(coalesce(auth.jwt() ->> 'email', '')) in ('daweed@lukio.site', 'nico@lukio.site')
-    or exists (
-      select 1 from public.app_admins a
-      where lower(a.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
-    )
-  );
+  with check (public.is_hu_admin());
 
 drop policy if exists "schularbeiten_update_admin" on public.schularbeiten;
 create policy "schularbeiten_update_admin"
   on public.schularbeiten for update
   to authenticated
-  using (
-    lower(coalesce(auth.jwt() ->> 'email', '')) in ('daweed@lukio.site', 'nico@lukio.site')
-    or exists (
-      select 1 from public.app_admins a
-      where lower(a.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
-    )
-  )
-  with check (
-    lower(coalesce(auth.jwt() ->> 'email', '')) in ('daweed@lukio.site', 'nico@lukio.site')
-    or exists (
-      select 1 from public.app_admins a
-      where lower(a.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
-    )
-  );
+  using (public.is_hu_admin())
+  with check (public.is_hu_admin());
 
 drop policy if exists "schularbeiten_delete_admin" on public.schularbeiten;
 create policy "schularbeiten_delete_admin"
   on public.schularbeiten for delete
   to authenticated
-  using (
-    lower(coalesce(auth.jwt() ->> 'email', '')) in ('daweed@lukio.site', 'nico@lukio.site')
-    or exists (
-      select 1 from public.app_admins a
-      where lower(a.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
-    )
-  );
+  using (public.is_hu_admin());
 
--- Realtime
 do $$
 begin
   alter publication supabase_realtime add table public.schularbeiten;

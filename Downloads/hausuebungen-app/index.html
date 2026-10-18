@@ -73,7 +73,7 @@
     <p class="nf-code">404</p>
     <h1 class="nf-title">Seite nicht gefunden</h1>
     <p class="nf-sub">Diese Adresse gibt es hier nicht.<br>
-      Gültig z. B. <code>#/</code>, <code>#/klassen-hu</code>, <code>#/unterlagen</code>, <code>#/tests</code>, <code>#/woche</code>.</p>
+      Gültig z. B. <code>#/</code>, <code>#/klassen-hu</code>, <code>#/unterlagen</code>, <code>#/tests</code>.</p>
     <button type="button" class="ban-back" id="nfHome">← Zur Startseite</button>
   </div>
 </section>
@@ -141,7 +141,6 @@
       <button role="tab" aria-selected="false" data-view="class">Klassen HÜ</button>
       <button role="tab" aria-selected="false" data-view="unterlagen">Unterlagen</button>
       <button role="tab" aria-selected="false" data-view="tests">Tests</button>
-      <button role="tab" aria-selected="false" data-view="week">Diese Woche</button>
       <button role="tab" aria-selected="false" data-view="admin" id="adminTab" hidden>Admin</button>
     </nav>
 
@@ -186,12 +185,6 @@
       </div>
       <div class="class-list" id="testsList"></div>
       <div class="empty" id="testsEmpty" hidden></div>
-    </section>
-
-    <section id="weekView" hidden>
-      <div class="section-head"><div><h2>Diese Woche</h2><p>Was du diese Woche noch zu erledigen hast.</p></div></div>
-      <div id="weekContent"></div>
-      <div class="empty" id="weekEmpty" hidden></div>
     </section>
 
     <section id="adminView" hidden>
@@ -369,7 +362,16 @@
   <div class="field"><label for="fTitle">Aufgabe</label><input type="text" id="fTitle" placeholder="z. B. Seite 42, Nr. 3–7" autocomplete="off"></div>
   <div class="field"><label for="fSubject">Fach</label><input type="text" id="fSubject" placeholder="Fach wählen oder tippen" autocomplete="off"><div class="chips" id="chips"></div></div>
   <div class="field"><label for="fDue">Fällig am</label><input type="date" id="fDue"></div>
-  <div class="field"><label for="fNote">Notiz</label><textarea id="fNote" placeholder="Optional – Details, Abgabeform, Material …"></textarea></div>
+  <div class="field"><label for="fNote">Notiz</label>
+    <div class="fmt-bar" data-for="fNote">
+      <button type="button" data-fmt="bold" title="Fett">B</button>
+      <button type="button" data-fmt="italic" title="Kursiv"><i>I</i></button>
+      <button type="button" data-fmt="ul" title="Liste">• Liste</button>
+      <button type="button" data-fmt="link" title="Link">Link</button>
+    </div>
+    <textarea id="fNote" placeholder="Optional – Details, Abgabeform, Material …"></textarea>
+    <p class="field-help">Format: **fett**, *kursiv*, - Liste, [Text](https://…)</p>
+  </div>
   <div class="check-row"><input type="checkbox" id="fImportant"><label for="fImportant" style="margin:0">Wichtig (rote Markierung)</label></div>
   <div class="field"><label for="fFiles">Dateien</label><input type="file" id="fFiles" multiple accept="*/*"><p class="field-help">Mehrere Dateien möglich. Max. 10 GB. Vorschau für PDF, Bilder, Text.</p><div id="fileQueue" class="file-queue"></div><div id="existingFiles" class="attachments"></div></div>
   <div class="actions"><button class="cancel" id="cancelBtn" type="button">Zurück</button><button class="del" id="delBtn" type="button" hidden>Löschen</button><button class="save" id="saveBtn" type="button">Speichern</button></div>
@@ -382,7 +384,15 @@
   <div class="field"><label for="cfTitle">Aufgabe</label><input type="text" id="cfTitle" placeholder="z. B. Arbeitsblatt 4"></div>
   <div class="field"><label for="cfSubject">Fach</label><input type="text" id="cfSubject" placeholder="Fach wählen oder tippen"><div class="chips" id="classChips"></div></div>
   <div class="field"><label for="cfDue">Fällig am</label><input type="date" id="cfDue"></div>
-  <div class="field"><label for="cfNote">Notiz</label><textarea id="cfNote" placeholder="Optional"></textarea></div>
+  <div class="field"><label for="cfNote">Notiz</label>
+    <div class="fmt-bar" data-for="cfNote">
+      <button type="button" data-fmt="bold" title="Fett">B</button>
+      <button type="button" data-fmt="italic" title="Kursiv"><i>I</i></button>
+      <button type="button" data-fmt="ul" title="Liste">• Liste</button>
+      <button type="button" data-fmt="link" title="Link">Link</button>
+    </div>
+    <textarea id="cfNote" placeholder="Optional"></textarea>
+  </div>
   <div class="field"><label for="cfFiles">Dateien</label><input type="file" id="cfFiles" multiple><p class="field-help">Mehrere Dateien möglich. Max. 10 GB.</p><div id="classFileQueue" class="file-queue"></div></div>
   <div class="actions"><button class="cancel" id="classCancelBtn" type="button">Zurück</button><button class="del" id="classDelBtn" type="button" hidden>Löschen</button><button class="save" id="classSaveBtn" type="button">Hinzufügen</button></div>
 </section>
@@ -394,7 +404,15 @@
   <div class="field"><label for="suTitle">Titel</label><input type="text" id="suTitle" placeholder="z. B. SÜ 3 – Vektoren"></div>
   <div class="field"><label for="suSubject">Fach / Stunde</label><input type="text" id="suSubject" placeholder="Fach wählen oder tippen"><div class="chips" id="suChips"></div></div>
   <div class="field"><label for="suDate">Stunde / Datum</label><input type="date" id="suDate"></div>
-  <div class="field"><label for="suNote">Notiz</label><textarea id="suNote" placeholder="Optional – was in der Stunde gemacht wurde"></textarea></div>
+  <div class="field"><label for="suNote">Notiz</label>
+    <div class="fmt-bar" data-for="suNote">
+      <button type="button" data-fmt="bold" title="Fett">B</button>
+      <button type="button" data-fmt="italic" title="Kursiv"><i>I</i></button>
+      <button type="button" data-fmt="ul" title="Liste">• Liste</button>
+      <button type="button" data-fmt="link" title="Link">Link</button>
+    </div>
+    <textarea id="suNote" placeholder="Optional – was in der Stunde gemacht wurde"></textarea>
+  </div>
   <div class="field"><label for="suFiles">Dateien</label><input type="file" id="suFiles" multiple><p class="field-help">Fotos, PDF, Arbeitsblätter. Max. 10 GB.</p><div id="suFileQueue" class="file-queue"></div></div>
   <div class="actions"><button class="cancel" id="suCancelBtn" type="button">Zurück</button><button class="del" id="suDelBtn" type="button" hidden>Löschen</button><button class="save" id="suSaveBtn" type="button">Hinzufügen</button></div>
 </section>
@@ -413,7 +431,15 @@
   <div class="field"><label for="tfTitle">Titel</label><input type="text" id="tfTitle" placeholder="z. B. SA 2 – Gleichungen" autocomplete="off"></div>
   <div class="field"><label for="tfSubject">Fach</label><input type="text" id="tfSubject" placeholder="Fach wählen oder tippen"><div class="chips" id="testChips"></div></div>
   <div class="field"><label for="tfDate">Datum</label><input type="date" id="tfDate"></div>
-  <div class="field"><label for="tfStoff">Stoff</label><textarea id="tfStoff" placeholder="Was kommt dran …"></textarea></div>
+  <div class="field"><label for="tfStoff">Stoff</label>
+    <div class="fmt-bar" data-for="tfStoff">
+      <button type="button" data-fmt="bold" title="Fett">B</button>
+      <button type="button" data-fmt="italic" title="Kursiv"><i>I</i></button>
+      <button type="button" data-fmt="ul" title="Liste">• Liste</button>
+      <button type="button" data-fmt="link" title="Link">Link</button>
+    </div>
+    <textarea id="tfStoff" placeholder="Was kommt dran …"></textarea>
+  </div>
   <div class="field"><label for="tfFiles">Unterlagen / Dateien</label><input type="file" id="tfFiles" multiple><p class="field-help">PDF, Bilder, Arbeitsblätter. Max. 10 GB.</p><div id="testFileQueue" class="file-queue"></div><div id="testExistingFiles" class="attachments"></div></div>
   <div class="field"><label>Lernlinks</label>
     <div id="testLearnLinks" class="link-list"></div>
@@ -602,7 +628,6 @@ const VIEW_HASH = {
   class: "#/klassen-hu",
   unterlagen: "#/unterlagen",
   tests: "#/tests",
-  week: "#/woche",
   admin: "#/admin"
 };
 const HASH_VIEW = {
@@ -610,7 +635,6 @@ const HASH_VIEW = {
   "/klassen-hu": "class", "/klassen-hü": "class", "/klassen": "class", "/class": "class",
   "/unterlagen": "unterlagen", "/su": "unterlagen", "/schuluebung": "unterlagen",
   "/tests": "tests", "/test": "tests", "/schularbeiten": "tests", "/pruefungen": "tests",
-  "/woche": "week", "/week": "week", "/diese-woche": "week",
   "/admin": "admin",
   "/einstellungen": "settings"
 };
@@ -623,7 +647,7 @@ function hashToView(hash) {
   return HASH_VIEW[h] || null;
 }
 function setMainView(next, opts = {}) {
-  const known = ["personal", "class", "unterlagen", "tests", "week", "admin"];
+  const known = ["personal", "class", "unterlagen", "tests", "admin"];
   if (!known.includes(next)) {
     showNotFound();
     return;
@@ -634,7 +658,6 @@ function setMainView(next, opts = {}) {
   $("classView").hidden = next !== "class";
   $("unterlagenView").hidden = next !== "unterlagen";
   if ($("testsView")) $("testsView").hidden = next !== "tests";
-  $("weekView").hidden = next !== "week";
   $("adminView").hidden = next !== "admin";
   $("personalBar").hidden = next !== "personal";
   $("classBar").hidden = next !== "class" || !canWriteClass();
@@ -650,7 +673,6 @@ function setMainView(next, opts = {}) {
     if (!isAdmin()) { setMainView("personal"); return; }
     loadAdminUsers(); loadUserAdmin(); loadActivity(); refreshPushStatus(); loadResetCodes(); loadIpAdmin(); loadAdminHub();
   }
-  if (next === "week") renderWeek();
   updateOpenCount();
   updateProgress();
   if (!opts.fromHash) {
@@ -2122,10 +2144,7 @@ function renderPersonal() {
   list.innerHTML = "";
   const schoolDay = nextSchoolDayISO();
   const tTab = $("tomorrowTab");
-  if (tTab) {
-    const wd = new Date().getDay();
-    tTab.textContent = (wd === 0 || wd === 6) ? "Montag" : "Morgen";
-  }
+  if (tTab) tTab.textContent = "Morgen";
   let filtered = items.filter(it => {
     if (filter === "open") return !it.done;
     if (filter === "done") return it.done;
@@ -2175,9 +2194,9 @@ function renderPersonal() {
       <button class="body" type="button">
         <p class="subject">${esc(it.subject || "")}${it.important ? " · Wichtig" : ""}</p>
         <p class="title">${esc(it.title)}</p>
-        ${it.note ? `<p class="note">${esc(it.note)}</p>` : ""}
+        ${it.note ? `<div class="note md-body">${formatMd(it.note)}</div>` : ""}
       </button>
-      <span class="due ${d !== null && d < 0 ? "late" : ""}">${dueLabel(it.due)}</span>`;
+      <span class="due ${d !== null && d < 0 ? "late" : d === 0 ? "today" : d === 1 ? "soon" : ""}">${dueLabel(it.due)}</span>`;
     wrap.appendChild(li);
     list.appendChild(wrap);
 
@@ -2408,10 +2427,10 @@ function renderClass() {
         <div>
           <p class="subject">${esc(it.subject || "")}</p>
           <h3>${esc(it.title)}</h3>
-          ${it.note ? `<p class="note">${esc(it.note)}</p>` : ""}
+          ${it.note ? `<div class="note md-body">${formatMd(it.note)}</div>` : ""}
           <p class="added-by">Hinzugefügt von ${esc(it.created_by_name || toName(it.created_by_email))}</p>
         </div>
-        <span class="due ${d !== null && d < 0 ? "late" : ""}">${dueLabel(it.due)}</span>
+        <span class="due ${d !== null && d < 0 ? "late" : d === 0 ? "today" : d === 1 ? "soon" : ""}">${dueLabel(it.due)}</span>
       </div>
       <div class="attachments" data-files="${it.id}"></div>
       <div class="link-list" data-links="${it.id}"></div>
@@ -2617,7 +2636,7 @@ function renderUnterlagen() {
         <div>
           <p class="subject">${esc(it.subject || "")}${when ? " · " + esc(when) : ""}</p>
           <h3>${esc(it.title)}</h3>
-          ${it.note ? `<p class="note">${esc(it.note)}</p>` : ""}
+          ${it.note ? `<div class="note md-body">${formatMd(it.note)}</div>` : ""}
           <p class="added-by">Von ${esc(it.created_by_name || toName(it.created_by_email))}</p>
         </div>
       </div>
@@ -2872,10 +2891,38 @@ function addTestLink(kind) {
 }
 $("tfLearnAdd")?.addEventListener("click", () => addTestLink("learn"));
 $("tfGenAdd")?.addEventListener("click", () => addTestLink("general"));
-$("tfFiles")?.addEventListener("change", () => {
-  testFiles = Array.from($("tfFiles").files || []);
+function renderTestFileQueue() {
   const q = $("testFileQueue");
-  if (q) q.textContent = testFiles.length ? testFiles.map(f => f.name).join(", ") : "";
+  if (!q) return;
+  q.innerHTML = "";
+  if (!testFiles.length) {
+    q.textContent = "";
+    return;
+  }
+  testFiles.forEach((f, idx) => {
+    const row = document.createElement("div");
+    row.className = "file-queue-item";
+    row.innerHTML = `<span>${esc(f.name || "Datei")}${f.size ? " (" + fmtSize(f.size) + ")" : ""}</span>`;
+    const rm = document.createElement("button");
+    rm.type = "button";
+    rm.textContent = "Entfernen";
+    rm.onclick = () => {
+      testFiles.splice(idx, 1);
+      renderTestFileQueue();
+    };
+    row.appendChild(rm);
+    q.appendChild(row);
+  });
+}
+$("tfFiles")?.addEventListener("change", () => {
+  const incoming = Array.from($("tfFiles").files || []);
+  for (const f of incoming) {
+    const key = `${f.name}|${f.size}|${f.lastModified}`;
+    if (testFiles.some(x => `${x.name}|${x.size}|${x.lastModified}` === key)) continue;
+    testFiles.push(f);
+  }
+  if ($("tfFiles")) $("tfFiles").value = "";
+  renderTestFileQueue();
 });
 
 async function loadTests() {
@@ -2937,10 +2984,10 @@ async function loadTests() {
         <div>
           <p class="subject">${esc(kindLabel)}${it.subject ? " · " + esc(it.subject) : ""}</p>
           <h3>${esc(it.title)}</h3>
-          ${it.stoff ? `<p class="note">${esc(it.stoff)}</p>` : ""}
+          ${it.stoff ? `<div class="note md-body">${formatMd(it.stoff)}</div>` : ""}
           <p class="added-by">Eingetragen von ${esc(it.created_by_name || toName(it.created_by_email) || "Admin")}</p>
         </div>
-        <span class="due ${d !== null && d < 0 ? "late" : ""}">${dueLabel(it.exam_date)}</span>
+        <span class="due ${d !== null && d < 0 ? "late" : d === 0 ? "today" : d === 1 ? "soon" : ""}">${dueLabel(it.exam_date)}</span>
       </div>
       ${filesHtml}
       ${linksHtml}
@@ -2980,6 +3027,7 @@ function openTestSheet(it) {
   testFiles = [];
   testLearnLinks = [];
   testGenLinks = [];
+  renderTestFileQueue();
   $("testSheetTitle").textContent = it ? "Termin bearbeiten" : "Test / Schularbeit hinzufügen";
   $("tfKind").value = it?.kind === "schularbeit" ? "schularbeit" : "test";
   $("tfTitle").value = it?.title || "";
@@ -3134,6 +3182,73 @@ $("testSaveBtn")?.addEventListener("click", async () => {
     $("testSaveBtn").disabled = false;
     $("testSaveBtn").textContent = testEditingId ? "Speichern" : "Hinzufügen";
   }
+});
+
+
+
+/* ─── Textformatierung (leichtes Markdown) ─── */
+function formatMd(src) {
+  if (!src) return "";
+  let s = esc(src);
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+  const lines = s.split("\n");
+  let out = [], inList = false;
+  for (const line of lines) {
+    const m = line.match(/^\s*[-•]\s+(.*)$/);
+    if (m) {
+      if (!inList) { out.push("<ul>"); inList = true; }
+      out.push("<li>" + m[1] + "</li>");
+    } else {
+      if (inList) { out.push("</ul>"); inList = false; }
+      out.push(line ? "<span class=\"md-line\">" + line + "</span>" : "<br>");
+    }
+  }
+  if (inList) out.push("</ul>");
+  return out.join("");
+}
+function applyFmt(taId, kind) {
+  const ta = $(taId);
+  if (!ta) return;
+  const start = ta.selectionStart ?? 0;
+  const end = ta.selectionEnd ?? 0;
+  const val = ta.value || "";
+  const sel = val.slice(start, end);
+  let insert = "", cursor = start;
+  if (kind === "bold") {
+    insert = sel ? `**${sel}**` : "**text**";
+    cursor = sel ? start + insert.length : start + 2;
+  } else if (kind === "italic") {
+    insert = sel ? `*${sel}*` : "*text*";
+    cursor = sel ? start + insert.length : start + 1;
+  } else if (kind === "ul") {
+    if (sel) {
+      insert = sel.split("\n").map(l => l.trim() ? `- ${l.replace(/^[-•]\s*/, "")}` : l).join("\n");
+    } else {
+      insert = "- ";
+    }
+    cursor = start + insert.length;
+  } else if (kind === "link") {
+    const label = sel || "Linktext";
+    const url = prompt("URL (https://…)", "https://") || "";
+    if (!url) return;
+    let href = url.trim();
+    if (!/^https?:\/\//i.test(href)) href = "https://" + href;
+    insert = `[${label}](${href})`;
+    cursor = start + insert.length;
+  }
+  ta.value = val.slice(0, start) + insert + val.slice(end);
+  ta.focus();
+  ta.setSelectionRange(cursor, cursor);
+  ta.dispatchEvent(new Event("input", { bubbles: true }));
+}
+document.querySelectorAll(".fmt-bar").forEach(bar => {
+  bar.addEventListener("click", e => {
+    const btn = e.target.closest("[data-fmt]");
+    if (!btn) return;
+    applyFmt(bar.dataset.for, btn.dataset.fmt);
+  });
 });
 
 
