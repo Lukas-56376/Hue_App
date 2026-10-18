@@ -27,10 +27,10 @@
     <p class="state-sub" id="banSub">Dieses Netzwerk oder Gerät darf die Hausübungen-App derzeit nicht nutzen. Bei einem Fehler wende dich an DaWeed oder Nico.</p>
     <div class="state-card">
       <div class="state-row"><span class="state-k">Grund</span><span class="state-v" id="banReason">—</span></div>
-      <div class="state-row"><span class="state-k">Gebannt am</span><span class="state-v" id="banWhen">—</span></div>
-      <div class="state-row"><span class="state-k">Ablauf</span><span class="state-v state-danger">Dauerhaft</span></div>
+      <div class="state-row"><span class="state-k">Gebannt</span><span class="state-v" id="banWhen">—</span></div>
+      <div class="state-row"><span class="state-k">Ablauf</span><span class="state-v state-danger" id="banUntil">Dauerhaft</span></div>
       <div class="state-row"><span class="state-k">IP</span><span class="state-v" id="banIpShow">—</span></div>
-      <div class="state-row"><span class="state-k">Durch</span><span class="state-v">Administrator</span></div>
+      <div class="state-row"><span class="state-k">Durch</span><span class="state-v" id="banBy">Administrator</span></div>
     </div>
     <button type="button" class="btn-primary" id="banRetry">Erneut prüfen</button>
     <p class="state-foot">Hausübungen</p>
@@ -532,7 +532,22 @@ const isAdminEmail = e => {
   return ADMIN_EMAILS.includes(x) || extraAdmins.has(x);
 };
 const MAX_BYTES = cfg.MAX_UPLOAD_BYTES || 10 * 1024 * 1024 * 1024;
-const SUBJECTS = ["GGP","PH","SEW","RISL","RK","RE","Ethic","NWT","D","SOPK","AM","MEDT","GETE","E","GINF","ITSI"];
+const SUBJECT_META = [
+  { code: "GGP", name: "Geografie, Geschichte und politische Bildung" },
+  { code: "PH", name: "Physik" },
+  { code: "SEW", name: "Software Entwicklung" },
+  { code: "NWTK", name: "Netzwerktechnik" },
+  { code: "D", name: "Deutsch" },
+  { code: "SOPK", name: "Sozial- und Personalkompetenz" },
+  { code: "AM", name: "Angewandte Mathematik" },
+  { code: "GETE", name: "Grundlagen der Elektrotechnik und Elektronik" },
+  { code: "E", name: "Englisch" },
+  { code: "GINF", name: "Grundlagen der Informatik" },
+  { code: "ITSI", name: "IT-Sicherheit" },
+  { code: "SECLAB", name: "Security Laboratory" }
+];
+const SUBJECTS = SUBJECT_META.map(s => s.code);
+const SUBJECT_NAME = Object.fromEntries(SUBJECT_META.map(s => [s.code, s.name]));
 
 let user = null, items = [], classItems = [], classDone = new Set(), permissions = [], filter = "open";
 let view = "personal", editingId = null, classEditingId = null, saving = false, toastTimer;
@@ -1335,13 +1350,19 @@ function fillSubjectSelect() {
   const sel = $("filterSubject");
   sel.innerHTML = '<option value="">Alle Fächer</option>';
   SUBJECTS.forEach(s => {
-    const o = document.createElement("option"); o.value = s; o.textContent = s; sel.appendChild(o);
+    const o = document.createElement("option");
+    o.value = s;
+    o.textContent = SUBJECT_NAME[s] ? `${s} — ${SUBJECT_NAME[s]}` : s;
+    sel.appendChild(o);
   });
 }
 function renderChips(containerId, inputId) {
-  const box = $(containerId); box.innerHTML = "";
+  const box = $(containerId); if (!box) return; box.innerHTML = "";
   SUBJECTS.forEach(s => {
-    const b = document.createElement("button"); b.type = "button"; b.textContent = s;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = s;
+    if (SUBJECT_NAME[s]) b.title = SUBJECT_NAME[s];
     b.onclick = () => {
       $(inputId).value = s;
       box.querySelectorAll("button").forEach(x => x.classList.toggle("active", x.textContent === s));
@@ -2446,7 +2467,7 @@ function renderClass() {
         <div class="comments-list" data-comments="${it.id}"></div>
       </div>
       <div class="class-actions">
-        <button type="button" class="toggle-btn ${done ? "on" : ""}" data-toggle="${it.id}">${done ? "Erledigt ✓" : "Als erledigt markieren"}</button>
+        <button type="button" class="small-btn toggle-btn ${done ? "on fill-done" : ""}" data-toggle="${it.id}">${done ? "Erledigt ✓" : "Als erledigt markieren"}</button>
         ${(isAdmin() || it.created_by === user.id) ? `<button type="button" class="small-btn" data-edit="${it.id}">Bearbeiten</button>` : ""}
         <button type="button" class="small-btn" data-report="${it.id}">Melden</button>
       </div>`;
