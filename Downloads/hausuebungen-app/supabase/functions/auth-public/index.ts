@@ -290,7 +290,7 @@ Deno.serve(async req => {
       return json({ banned: !!banned.data, reason: banned.data?.reason || null, ip: ip || null });
     }
 
-    if (action === "list_ip_logs" || action === "list_ip_bans" || action === "ban_ip" || action === "unban_ip") {
+    if (action === "list_ip_logs" || action === "list_ip_bans" || action === "ban_ip" || action === "unban_ip" || action === "list_devices") {
       const auth = req.headers.get("Authorization");
       if (!auth) return json({ error: "Unauthorized" }, 401);
       const token = auth.replace(/^Bearer\s+/i, "");
@@ -306,6 +306,25 @@ Deno.serve(async req => {
         const { data, error } = await admin.from("ip_bans").select("*").order("created_at", { ascending: false }).limit(100);
         if (error) throw error;
         return json({ bans: data || [] });
+      }
+      if (action === "list_devices") {
+        const { data: logs, error } = await admin.from("ip_logs").select("ip,user_email,created_at,action").order("created_at", { ascending: false }).limit(400);
+        if (error) throw error;
+        const { data: bans } = await admin.from("ip_bans").select("ip").eq("active", true);
+        const banned = new Set((bans || []).map((b: { ip: string }) => b.ip));
+        const map = new Map<string, { ip: string; user_email: string | null; last_seen: string; banned: boolean }>();
+        for (const row of logs || []) {
+          const ip = String(row.ip || "").trim();
+          if (!ip) continue;
+          if (map.has(ip)) continue;
+          map.set(ip, {
+            ip,
+            user_email: row.user_email || null,
+            last_seen: row.created_at,
+            banned: banned.has(ip)
+          });
+        }
+        return json({ devices: [...map.values()] });
       }
       if (action === "ban_ip") {
         const ip = String(body.ip || "").trim();

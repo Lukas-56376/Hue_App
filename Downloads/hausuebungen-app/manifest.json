@@ -6,10 +6,15 @@
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#121212",
-  "theme_color": "#121212",
+  "background_color": "#f5f5f7",
+  "theme_color": "#f5f5f7",
   "icons": [
-    {"src": "icon.jpg", "sizes": "512x512", "type": "image/jpeg", "purpose": "any maskable"}
+    {
+      "src": "icon.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
   ],
   "shortcuts": [
     {
@@ -23,12 +28,6 @@
       "short_name": "Klasse",
       "url": "./#/klassen-hu",
       "description": "Gemeinsame Klassen-Hausübungen"
-    },
-    {
-      "name": "Widget",
-      "short_name": "Widget",
-      "url": "./#/widget",
-      "description": "Kompakte Übersicht nächster HÜ"
     }
   ]
 }

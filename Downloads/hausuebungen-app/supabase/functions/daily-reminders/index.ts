@@ -94,13 +94,15 @@ Deno.serve(async req => {
       { data: personal },
       { data: classHu },
       { data: completions },
-      { data: subs }
+      { data: subs },
+      { data: exams }
     ] = await Promise.all([
       supabase.from("user_settings").select("*"),
       supabase.from("hausuebungen").select("id,user_id,title,due,done"),
       supabase.from("klassen_huebungen").select("id,title,due"),
       supabase.from("class_hu_completions").select("class_hu_id,user_id,done"),
-      supabase.from("push_subscriptions").select("id,user_id,subscription")
+      supabase.from("push_subscriptions").select("id,user_id,subscription"),
+      supabase.from("schularbeiten").select("id,title,subject,kind,exam_date")
     ]);
 
     const settingsByUser = new Map((settings || []).map(s => [s.user_id, s]));
@@ -200,6 +202,57 @@ Deno.serve(async req => {
 
         if (!force) {
           for (const itemKey of keys) {
+            await supabase.from("reminder_sent").upsert({
+              user_id: userId,
+              item_key: itemKey,
+              stage: stage.key,
+              sent_on: today
+            }, { onConflict: "user_id,item_key,stage,sent_on", ignoreDuplicates: true });
+          }
+        }
+      }
+    }
+
+    // Tests / Schularbeiten: 7 Tage, 3 Tage, 1 Tag vorher (Kalendertage, ~ Erinnerungszeit)
+    const examStages = [
+      { key: "exam-7d", days: 7, label: "in einer Woche" },
+      { key: "exam-3d", days: 3, label: "in 3 Tagen" },
+      { key: "exam-1d", days: 1, label: "morgen" }
+    ];
+    for (const stage of examStages) {
+      const target = addDaysISO(today, stage.days);
+      const dueExams = (exams || []).filter(e => e.exam_date === target);
+      if (!dueExams.length) continue;
+      for (const userId of users) {
+        const st = { ...defaultSettings, ...(settingsByUser.get(userId) || {}) };
+        if (!st.notify_enabled) continue;
+        if (!timeMatches(st.remind_time, now.hour, now.minute, force)) continue;
+        for (const ex of dueExams) {
+          const itemKey = `exam:${ex.id}`;
+          const { data: already } = await supabase.from("reminder_sent")
+            .select("id").eq("user_id", userId).eq("item_key", itemKey)
+            .eq("stage", stage.key).eq("sent_on", today).maybeSingle();
+          if (already && !force) continue;
+          const kindL = ex.kind === "schularbeit" ? "Schularbeit" : "Test";
+          const bodyText = `${kindL} ${stage.label}: ${ex.title}${ex.subject ? " (" + ex.subject + ")" : ""} · ${ex.exam_date}`;
+          const userSubs = (subs || []).filter(s => s.user_id === userId);
+          for (const sub of userSubs) {
+            try {
+              await webpush.sendNotification(sub.subscription, JSON.stringify({
+                title: `${kindL}-Erinnerung`,
+                body: bodyText,
+                tag: `exam-${stage.key}-${ex.id}`,
+                url: "./#/tests"
+              }));
+              sent++;
+            } catch (e) {
+              const status = Number((e as { statusCode?: number })?.statusCode);
+              if (status === 404 || status === 410) {
+                await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+              }
+            }
+          }
+          if (!force) {
             await supabase.from("reminder_sent").upsert({
               user_id: userId,
               item_key: itemKey,

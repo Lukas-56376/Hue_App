@@ -73,13 +73,15 @@
     <p class="nf-code">404</p>
     <h1 class="nf-title">Seite nicht gefunden</h1>
     <p class="nf-sub">Diese Adresse gibt es hier nicht.<br>
-      Gültig z. B. <code>#/</code>, <code>#/klassen-hu</code>, <code>#/unterlagen</code>, <code>#/woche</code>.</p>
+      Gültig z. B. <code>#/</code>, <code>#/klassen-hu</code>, <code>#/unterlagen</code>, <code>#/tests</code>, <code>#/woche</code>.</p>
     <button type="button" class="ban-back" id="nfHome">← Zur Startseite</button>
   </div>
 </section>
 
 <section id="auth" hidden>
+  <p class="auth-kicker">Persönlich. Klasse. Unterlagen.</p>
   <h1>Hausübungen</h1>
+  <p class="auth-lead">Alles, was noch zu erledigen ist — klar und an einem Ort.</p>
   
   <div id="authLogin">
     <div class="field"><label for="aUser">Benutzername</label><input type="text" id="aUser" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="dein Benutzername"></div>
@@ -120,8 +122,8 @@
         <p class="tally"><span class="mark" id="openCount">…</span></p>
       </div>
       <div class="acct">
-        <button type="button" class="theme-btn" id="settingsBtn" aria-label="Einstellungen" title="Einstellungen">⚙</button>
-          <button type="button" class="theme-btn" id="themeBtn" aria-label="Dark/Light Mode" title="Design wechseln">◐</button>
+        <button type="button" class="theme-btn icon-settings" id="settingsBtn" aria-label="Einstellungen" title="Einstellungen"></button>
+        <button type="button" class="theme-btn icon-theme" id="themeBtn" aria-label="Darstellung wechseln" title="Darstellung wechseln"></button>
         <span class="nm" id="acctName"></span>
         <button class="out" id="logout" type="button">Abmelden</button>
       </div>
@@ -138,6 +140,7 @@
       <button role="tab" aria-selected="true" data-view="personal">Persönlich</button>
       <button role="tab" aria-selected="false" data-view="class">Klassen HÜ</button>
       <button role="tab" aria-selected="false" data-view="unterlagen">Unterlagen</button>
+      <button role="tab" aria-selected="false" data-view="tests">Tests</button>
       <button role="tab" aria-selected="false" data-view="week">Diese Woche</button>
       <button role="tab" aria-selected="false" data-view="admin" id="adminTab" hidden>Admin</button>
     </nav>
@@ -177,18 +180,21 @@
       <div class="empty" id="suEmpty" hidden></div>
     </section>
 
+    <section id="testsView" hidden>
+      <div class="section-head">
+        <div><h2>Tests &amp; Schularbeiten</h2><p>Termine, Stoff, Unterlagen und Lernlinks. Erinnerung 1 Woche, 3 Tage und 1 Tag vorher.</p></div>
+      </div>
+      <div class="class-list" id="testsList"></div>
+      <div class="empty" id="testsEmpty" hidden></div>
+    </section>
+
     <section id="weekView" hidden>
       <div class="section-head"><div><h2>Diese Woche</h2><p>Was du diese Woche noch zu erledigen hast.</p></div></div>
       <div id="weekContent"></div>
       <div class="empty" id="weekEmpty" hidden></div>
     </section>
 
-    <section id="widgetView" hidden>
-        <div class="section-head"><div><h2>Widget</h2><p>Nächste offene Hausübungen.</p></div></div>
-        <div id="widgetList"></div>
-        <button type="button" class="small-btn" id="widgetBack" style="margin-top:12px">← Zurück</button>
-      </section>
-      <section id="adminView" hidden>
+    <section id="adminView" hidden>
       <div class="section-head"><div><h2>Admin</h2><p>Schreibrechte & Aktivität.</p></div></div>
       <div class="admin-card">
         <h3>Benutzer</h3>
@@ -353,6 +359,7 @@
   <div class="bar" id="personalBar"><button id="addBtn" type="button">Neue Hausübung</button></div>
   <div class="bar" id="classBar" hidden><button id="addClassBtn" type="button">Klassen-HÜ hinzufügen</button></div>
   <div class="bar" id="suBar" hidden><button id="addSuBtn" type="button">Schulübung hinzufügen</button></div>
+  <div class="bar" id="testsBar" hidden><button id="addTestBtn" type="button">Test / Schularbeit hinzufügen</button></div>
 </div>
 
 <div class="scrim" id="scrim" hidden></div>
@@ -393,6 +400,41 @@
 </section>
 
 
+<div class="scrim" id="testScrim" hidden></div>
+<section class="sheet" id="testSheet" hidden aria-modal="true" role="dialog" aria-labelledby="testSheetTitle">
+  <div class="grip"></div>
+  <h2 id="testSheetTitle">Test / Schularbeit</h2>
+  <div class="field"><label for="tfKind">Art</label>
+    <select id="tfKind">
+      <option value="test">Test</option>
+      <option value="schularbeit">Schularbeit</option>
+    </select>
+  </div>
+  <div class="field"><label for="tfTitle">Titel</label><input type="text" id="tfTitle" placeholder="z. B. SA 2 – Gleichungen" autocomplete="off"></div>
+  <div class="field"><label for="tfSubject">Fach</label><input type="text" id="tfSubject" placeholder="Fach wählen oder tippen"><div class="chips" id="testChips"></div></div>
+  <div class="field"><label for="tfDate">Datum</label><input type="date" id="tfDate"></div>
+  <div class="field"><label for="tfStoff">Stoff</label><textarea id="tfStoff" placeholder="Was kommt dran …"></textarea></div>
+  <div class="field"><label for="tfFiles">Unterlagen / Dateien</label><input type="file" id="tfFiles" multiple><p class="field-help">PDF, Bilder, Arbeitsblätter. Max. 10 GB.</p><div id="testFileQueue" class="file-queue"></div><div id="testExistingFiles" class="attachments"></div></div>
+  <div class="field"><label>Lernlinks</label>
+    <div id="testLearnLinks" class="link-list"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <input type="url" id="tfLearnUrl" placeholder="https:// …" style="flex:1;min-width:140px">
+      <input type="text" id="tfLearnLabel" placeholder="Bezeichnung" style="flex:1;min-width:100px">
+      <button type="button" class="small-btn" id="tfLearnAdd">Hinzufügen</button>
+    </div>
+  </div>
+  <div class="field"><label>Weitere Links</label>
+    <div id="testGenLinks" class="link-list"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <input type="url" id="tfGenUrl" placeholder="https:// …" style="flex:1;min-width:140px">
+      <input type="text" id="tfGenLabel" placeholder="Bezeichnung" style="flex:1;min-width:100px">
+      <button type="button" class="small-btn" id="tfGenAdd">Hinzufügen</button>
+    </div>
+  </div>
+  <p class="field-help">Automatische Push: 7 Tage, 3 Tage und 1 Tag vor dem Termin (ca. 10 Uhr).</p>
+  <div class="actions"><button class="cancel" id="testCancelBtn" type="button">Zurück</button><button class="del" id="testDelBtn" type="button" hidden>Löschen</button><button class="save" id="testSaveBtn" type="button">Speichern</button></div>
+</section>
+
 <div class="scrim" id="settingsScrim" hidden></div>
 <section class="sheet" id="settingsSheet" hidden aria-modal="true" role="dialog" aria-labelledby="settingsTitle">
   <div class="grip"></div>
@@ -421,9 +463,7 @@
     <button type="button" class="small-btn" id="refreshDevices" style="margin-top:8px">Aktualisieren</button>
   </div>
   <div id="setApp" hidden>
-    <p class="field-help">App zum Home-Bildschirm: Browser-Menü → „Zum Home-Bildschirm“ / „Installieren“.</p>
-    <p class="field-help">Widget-Ansicht: kompakte Liste der nächsten HÜ.</p>
-    <button type="button" class="small-btn" id="openWidgetBtn">Widget-Ansicht öffnen</button>
+    <p class="field-help">Zum Home-Bildschirm: Browser-Menü → „Zum Home-Bildschirm“ oder „Installieren“.</p>
     <p class="field-help" id="offlineStatus" style="margin-top:12px">Offline-Status: …</p>
   </div>
   <div class="actions" style="margin-top:16px">
@@ -450,6 +490,7 @@ const PERM_TABLE = "klassen_hu_permissions";
 const COMP_TABLE = "class_hu_completions";
 const LOG_TABLE = "activity_logs";
 const SU_TABLE = "unterlagen";
+const TESTS_TABLE = "schularbeiten";
     const SETTINGS_TABLE = "user_settings";
     const COMMENTS_TABLE = "hu_comments";
     const LINKS_TABLE = "hu_links";
@@ -470,6 +511,7 @@ const SUBJECTS = ["GGP","PH","SEW","RISL","RK","RE","Ethic","NWT","D","SOPK","AM
 let user = null, items = [], classItems = [], classDone = new Set(), permissions = [], filter = "open";
 let view = "personal", editingId = null, classEditingId = null, saving = false, toastTimer;
 let personalFiles = [], classFiles = [], suFiles = [], suItems = [], suEditingId = null, channels = [];
+let testItems = [], testFiles = [], testEditingId = null, testLearnLinks = [], testGenLinks = [];
 let filterSubject = "", filterDue = "", filterImportant = false;
 let dragSrcId = null;
 let screenPreview = null;
@@ -479,14 +521,12 @@ if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) throw new Error("config missing
 /* ─── Theme ─── */
 function applyTheme(t) {
   document.documentElement.setAttribute("data-theme", t);
-  $("themeColor").content = t === "dark" ? "#121212" : "#ffffff";
-  $("themeBtn").textContent = t === "dark" ? "☀" : "☾";
+  $("themeColor").content = t === "dark" ? "#000000" : "#f5f5f7";
   localStorage.setItem("hu-theme", t);
 }
 (function initTheme() {
   const saved = localStorage.getItem("hu-theme");
-  const pref = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  applyTheme(saved || pref);
+  applyTheme(saved === "dark" ? "dark" : "light");
 })();
 $("themeBtn").onclick = () => {
   const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
@@ -561,17 +601,17 @@ const VIEW_HASH = {
   personal: "#/",
   class: "#/klassen-hu",
   unterlagen: "#/unterlagen",
+  tests: "#/tests",
   week: "#/woche",
-  admin: "#/admin",
-  widget: "#/widget"
+  admin: "#/admin"
 };
 const HASH_VIEW = {
   "": "personal", "/": "personal", "/personal": "personal", "/persoenlich": "personal",
   "/klassen-hu": "class", "/klassen-hü": "class", "/klassen": "class", "/class": "class",
   "/unterlagen": "unterlagen", "/su": "unterlagen", "/schuluebung": "unterlagen",
+  "/tests": "tests", "/test": "tests", "/schularbeiten": "tests", "/pruefungen": "tests",
   "/woche": "week", "/week": "week", "/diese-woche": "week",
   "/admin": "admin",
-  "/widget": "widget",
   "/einstellungen": "settings"
 };
 function hashToView(hash) {
@@ -583,7 +623,7 @@ function hashToView(hash) {
   return HASH_VIEW[h] || null;
 }
 function setMainView(next, opts = {}) {
-  const known = ["personal", "class", "unterlagen", "week", "admin", "widget"];
+  const known = ["personal", "class", "unterlagen", "tests", "week", "admin"];
   if (!known.includes(next)) {
     showNotFound();
     return;
@@ -593,23 +633,24 @@ function setMainView(next, opts = {}) {
   $("personalView").hidden = next !== "personal";
   $("classView").hidden = next !== "class";
   $("unterlagenView").hidden = next !== "unterlagen";
+  if ($("testsView")) $("testsView").hidden = next !== "tests";
   $("weekView").hidden = next !== "week";
   $("adminView").hidden = next !== "admin";
-  if ($("widgetView")) $("widgetView").hidden = next !== "widget";
   $("personalBar").hidden = next !== "personal";
   $("classBar").hidden = next !== "class" || !canWriteClass();
   $("suBar").hidden = next !== "unterlagen" || !canWriteClass();
+  if ($("testsBar")) $("testsBar").hidden = next !== "tests" || !isAdmin();
   for (const b of document.querySelectorAll(".main-tabs button:not([hidden])")) {
     b.setAttribute("aria-selected", b.dataset.view === next ? "true" : "false");
   }
   if (next === "class") loadClass();
   if (next === "unterlagen") loadUnterlagen();
+  if (next === "tests") loadTests();
   if (next === "admin") {
     if (!isAdmin()) { setMainView("personal"); return; }
     loadAdminUsers(); loadUserAdmin(); loadActivity(); refreshPushStatus(); loadResetCodes(); loadIpAdmin(); loadAdminHub();
   }
   if (next === "week") renderWeek();
-  if (next === "widget") renderWidget();
   updateOpenCount();
   updateProgress();
   if (!opts.fromHash) {
@@ -660,6 +701,7 @@ function updateAdminUI() {
   $("adminTab").hidden = !isAdmin();
   $("classBar").hidden = view !== "class" || !canWriteClass();
   $("suBar").hidden = view !== "unterlagen" || !canWriteClass();
+  if ($("testsBar")) $("testsBar").hidden = view !== "tests" || !isAdmin();
   $("classPermissionNote").hidden = canWriteClass();
   $("classPermissionNote").textContent = "Du hast derzeit kein Schreibrecht für Klassen HÜ / Unterlagen. Ein Admin kann es wieder freigeben.";
   const suNote = $("suPermissionNote");
@@ -882,7 +924,7 @@ async function showApp(session) {
   if (await blockIfMaintenance()) return;
   await loadPublicNotices();
   await loadPermissions();
-  await Promise.all([loadPersonal(), loadClass(), loadUnterlagen()]);
+  await Promise.all([loadPersonal(), loadClass(), loadUnterlagen(), loadTests()]);
   subscribeAll();
   applyHashRoute();
   updateAdminUI();
@@ -1171,11 +1213,6 @@ $("settingsSave")?.addEventListener("click", async () => {
   toast("Einstellungen gespeichert.");
   hideSheet("settingsSheet", "settingsScrim");
 });
-$("openWidgetBtn")?.addEventListener("click", () => {
-  hideSheet("settingsSheet", "settingsScrim");
-  setMainView("widget");
-});
-$("widgetBack")?.addEventListener("click", () => setMainView("personal"));
 $("refreshDevices")?.addEventListener("click", () => loadDevices());
 
 async function loadDevices() {
@@ -1222,27 +1259,6 @@ function loadOfflineSnapshot() {
     if (!raw) return null;
     return JSON.parse(raw);
   } catch { return null; }
-}
-
-function renderWidget() {
-  const el = $("widgetList");
-  if (!el) return;
-  el.innerHTML = "";
-  const open = [
-    ...items.filter(i => !i.done).map(i => ({ title: i.title, subject: i.subject, due: i.due, kind: "persönlich" })),
-    ...classItems.filter(c => !classDone.has(c.id)).map(c => ({ title: c.title, subject: c.subject, due: c.due, kind: "Klasse" }))
-  ].sort((a, b) => String(a.due || "9999").localeCompare(String(b.due || "9999"))).slice(0, 8);
-  if (!open.length) {
-    el.innerHTML = '<div class="empty"><h2>Nichts offenes</h2></div>';
-    return;
-  }
-  for (const x of open) {
-    const card = document.createElement("div");
-    card.className = "week-card";
-    card.innerHTML = `<h4>${esc(x.subject || "–")} · ${esc(dueLabel(x.due) || x.due || "")}</h4>
-      <p style="margin:4px 0 0">${esc(x.title)} <span class="field-help">(${x.kind})</span></p>`;
-    el.appendChild(card);
-  }
 }
 
 async function loadComments(classHuId, container) {
@@ -2187,6 +2203,7 @@ function setupSwipe(wrap, it) {
     if (!dragging) return;
     currentX = (e.touches ? e.touches[0].clientX : e.clientX) - startX;
     if (Math.abs(currentX) < 8) return;
+    wrap.classList.add("swiping");
     row.style.transform = `translateX(${currentX}px)`;
     wrap.classList.toggle("swiping-done", currentX > 40);
     wrap.classList.toggle("swiping-del", currentX < -40);
@@ -2208,7 +2225,7 @@ function setupSwipe(wrap, it) {
     } else {
       row.style.transform = "";
     }
-    wrap.classList.remove("swiping-done", "swiping-del");
+    wrap.classList.remove("swiping", "swiping-done", "swiping-del");
     currentX = 0;
   };
   wrap.addEventListener("touchstart", onStart, { passive: true });
@@ -2633,6 +2650,7 @@ function openSuSheet(it) {
   $("suFiles").value = "";
   $("suFileQueue").innerHTML = "";
   renderChips("suChips", "suSubject");
+renderChips("testChips", "tfSubject");
   showSheet("suSheet", "suScrim");
 }
 $("addSuBtn").onclick = () => openSuSheet(null);
@@ -2811,6 +2829,313 @@ async function uploadSolutions(files, classHuId) {
     if (error) throw error;
   }
 }
+
+
+/* ─── Tests & Schularbeiten ─── */
+function renderTestLinkChips(containerId, arr) {
+  const el = $(containerId);
+  if (!el) return;
+  el.innerHTML = "";
+  arr.forEach((L, idx) => {
+    const a = document.createElement("a");
+    a.className = "link-chip";
+    a.href = L.url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = L.label || L.url;
+    const x = document.createElement("button");
+    x.type = "button";
+    x.className = "small-btn";
+    x.textContent = "×";
+    x.style.marginLeft = "6px";
+    x.onclick = (e) => { e.preventDefault(); arr.splice(idx, 1); renderTestLinkChips(containerId, arr); };
+    const wrap = document.createElement("span");
+    wrap.style.display = "inline-flex";
+    wrap.style.alignItems = "center";
+    wrap.appendChild(a);
+    if (isAdmin()) wrap.appendChild(x);
+    el.appendChild(wrap);
+  });
+}
+function addTestLink(kind) {
+  const urlEl = kind === "learn" ? $("tfLearnUrl") : $("tfGenUrl");
+  const labEl = kind === "learn" ? $("tfLearnLabel") : $("tfGenLabel");
+  const url = (urlEl.value || "").trim();
+  if (!url) { toast("Link-URL fehlt."); return; }
+  let href = url;
+  if (!/^https?:\/\//i.test(href)) href = "https://" + href;
+  const label = (labEl.value || "").trim() || href;
+  const arr = kind === "learn" ? testLearnLinks : testGenLinks;
+  arr.push({ url: href, label, type: kind });
+  urlEl.value = ""; labEl.value = "";
+  renderTestLinkChips(kind === "learn" ? "testLearnLinks" : "testGenLinks", arr);
+}
+$("tfLearnAdd")?.addEventListener("click", () => addTestLink("learn"));
+$("tfGenAdd")?.addEventListener("click", () => addTestLink("general"));
+$("tfFiles")?.addEventListener("change", () => {
+  testFiles = Array.from($("tfFiles").files || []);
+  const q = $("testFileQueue");
+  if (q) q.textContent = testFiles.length ? testFiles.map(f => f.name).join(", ") : "";
+});
+
+async function loadTests() {
+  const list = $("testsList"), empty = $("testsEmpty");
+  if (!list) return;
+  const { data, error } = await sb.from(TESTS_TABLE).select("*").order("exam_date", { ascending: true }).order("created_at", { ascending: false });
+  if (error) {
+    list.innerHTML = "";
+    if (empty) {
+      empty.hidden = false;
+      empty.innerHTML = "<h2>Noch keine Tabelle</h2><p>SQL <code>schularbeiten-setup.sql</code> im Supabase SQL Editor ausführen.</p><p class=\"field-help\">" + esc(error.message) + "</p>";
+    }
+    return;
+  }
+  testItems = data || [];
+  list.innerHTML = "";
+  if (!testItems.length) {
+    if (empty) {
+      empty.hidden = false;
+      empty.innerHTML = isAdmin()
+        ? "<h2>Noch keine Tests</h2><p>Leg den ersten Termin an.</p>"
+        : "<h2>Keine anstehenden Tests</h2><p>Sobald etwas eingetragen ist, erscheint es hier.</p>";
+    }
+    return;
+  }
+  if (empty) empty.hidden = true;
+  const today = todayISO();
+  for (const it of testItems) {
+    const d = daysFrom(it.exam_date);
+    const card = document.createElement("div");
+    card.className = "class-card"
+      + (d !== null && d < 0 ? " overdue" : "")
+      + (d === 0 ? " due-today" : "")
+      + (d === 1 ? " due-tomorrow" : "");
+    const kindLabel = it.kind === "schularbeit" ? "Schularbeit" : "Test";
+    const links = Array.isArray(it.links) ? it.links : [];
+    const files = Array.isArray(it.files) ? it.files : [];
+    const learn = links.filter(L => L.type === "learn");
+    const gen = links.filter(L => L.type !== "learn");
+    let linksHtml = "";
+    if (learn.length) {
+      linksHtml += `<p class="solutions-label">Lernlinks</p><div class="link-list">${learn.map(L =>
+        `<a class="link-chip" href="${esc(L.url)}" target="_blank" rel="noopener">${esc(L.label || L.url)}</a>`
+      ).join("")}</div>`;
+    }
+    if (gen.length) {
+      linksHtml += `<p class="solutions-label">Links</p><div class="link-list">${gen.map(L =>
+        `<a class="link-chip" href="${esc(L.url)}" target="_blank" rel="noopener">${esc(L.label || L.url)}</a>`
+      ).join("")}</div>`;
+    }
+    let filesHtml = "";
+    if (files.length) {
+      filesHtml = `<p class="solutions-label">Unterlagen</p><div class="attachments">${files.map((f, i) =>
+        `<button type="button" class="file-link" data-test-file="${it.id}:${i}">${esc(f.name || "Datei")}${f.size ? " (" + fmtSize(f.size) + ")" : ""}</button>`
+      ).join("")}</div>`;
+    }
+    card.innerHTML = `
+      <div class="class-top">
+        <div>
+          <p class="subject">${esc(kindLabel)}${it.subject ? " · " + esc(it.subject) : ""}</p>
+          <h3>${esc(it.title)}</h3>
+          ${it.stoff ? `<p class="note">${esc(it.stoff)}</p>` : ""}
+          <p class="added-by">Eingetragen von ${esc(it.created_by_name || toName(it.created_by_email) || "Admin")}</p>
+        </div>
+        <span class="due ${d !== null && d < 0 ? "late" : ""}">${dueLabel(it.exam_date)}</span>
+      </div>
+      ${filesHtml}
+      ${linksHtml}
+      ${isAdmin() ? `<div class="class-actions">
+        <button type="button" class="small-btn" data-test-edit="${it.id}">Bearbeiten</button>
+        <button type="button" class="small-btn danger-btn" data-test-del="${it.id}">Löschen</button>
+      </div>` : ""}`;
+    list.appendChild(card);
+  }
+  list.querySelectorAll("[data-test-edit]").forEach(btn => {
+    btn.onclick = () => {
+      const it = testItems.find(x => x.id === btn.dataset.testEdit);
+      if (it) openTestSheet(it);
+    };
+  });
+  list.querySelectorAll("[data-test-del]").forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm("Diesen Termin wirklich löschen?")) return;
+      const { error } = await sb.from(TESTS_TABLE).delete().eq("id", btn.dataset.testDel);
+      if (error) toast(error.message);
+      else { toast("Gelöscht."); loadTests(); }
+    };
+  });
+  list.querySelectorAll("[data-test-file]").forEach(btn => {
+    btn.onclick = () => {
+      const [id, idx] = btn.dataset.testFile.split(":");
+      const it = testItems.find(x => x.id === id);
+      const f = it && Array.isArray(it.files) ? it.files[Number(idx)] : null;
+      if (f) openPreview(f);
+    };
+  });
+}
+
+function openTestSheet(it) {
+  if (!isAdmin()) { toast("Nur Admins können Tests eintragen."); return; }
+  testEditingId = it?.id || null;
+  testFiles = [];
+  testLearnLinks = [];
+  testGenLinks = [];
+  $("testSheetTitle").textContent = it ? "Termin bearbeiten" : "Test / Schularbeit hinzufügen";
+  $("tfKind").value = it?.kind === "schularbeit" ? "schularbeit" : "test";
+  $("tfTitle").value = it?.title || "";
+  $("tfSubject").value = it?.subject || "";
+  $("tfDate").value = it?.exam_date || "";
+  $("tfStoff").value = it?.stoff || "";
+  if ($("tfFiles")) $("tfFiles").value = "";
+  if ($("testFileQueue")) $("testFileQueue").textContent = "";
+  const existing = $("testExistingFiles");
+  if (existing) {
+    existing.innerHTML = "";
+    const files = Array.isArray(it?.files) ? it.files : [];
+    files.forEach((f, i) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "file-link";
+      b.textContent = f.name || "Datei";
+      b.onclick = () => openPreview(f);
+      existing.appendChild(b);
+    });
+  }
+  const links = Array.isArray(it?.links) ? it.links : [];
+  testLearnLinks = links.filter(L => L.type === "learn").map(L => ({ ...L }));
+  testGenLinks = links.filter(L => L.type !== "learn").map(L => ({ ...L, type: "general" }));
+  renderTestLinkChips("testLearnLinks", testLearnLinks);
+  renderTestLinkChips("testGenLinks", testGenLinks);
+  $("testDelBtn").hidden = !testEditingId;
+  $("testSaveBtn").textContent = testEditingId ? "Speichern" : "Hinzufügen";
+  showSheet("testSheet", "testScrim");
+}
+$("addTestBtn")?.addEventListener("click", () => openTestSheet(null));
+$("testCancelBtn")?.addEventListener("click", () => hideSheet("testSheet", "testScrim"));
+$("testScrim")?.addEventListener("click", () => hideSheet("testSheet", "testScrim"));
+$("testDelBtn")?.addEventListener("click", async () => {
+  if (!testEditingId || !confirm("Löschen?")) return;
+  const { error } = await sb.from(TESTS_TABLE).delete().eq("id", testEditingId);
+  if (error) toast(error.message);
+  else { hideSheet("testSheet", "testScrim"); toast("Gelöscht."); loadTests(); }
+});
+
+async function uploadTestFiles(files) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) throw new Error("Nicht angemeldet");
+  const out = [];
+  for (const raw of files) {
+    const file = await asBrowserBlob(raw);
+    const path = `tests/${crypto.randomUUID()}_${safeName(raw.name || file.name || "datei")}`;
+    const small = (raw.size || file.size || 0) < 50 * 1024 * 1024;
+    if (small) {
+      const { error } = await sb.storage.from("hu-files").upload(path, file, {
+        contentType: file.type || "application/octet-stream", upsert: false
+      });
+      if (error) throw error;
+    } else {
+      await new Promise((resolve, reject) => {
+        const upload = new tus.Upload(file, {
+          endpoint: tusEndpoint,
+          retryDelays: [0, 1000, 3000, 5000, 10000],
+          headers: { authorization: `Bearer ${session.access_token}`, "x-upsert": "false" },
+          uploadDataDuringCreation: true,
+          removeFingerprintOnSuccess: true,
+          metadata: {
+            bucketName: "hu-files",
+            objectName: path,
+            contentType: file.type || "application/octet-stream",
+            cacheControl: "3600"
+          },
+          chunkSize: 6 * 1024 * 1024,
+          onError: reject,
+          onSuccess: () => resolve()
+        });
+        upload.findPreviousUploads().then(prev => {
+          if (prev.length) upload.resumeFromPreviousUpload(prev[0]);
+          upload.start();
+        }).catch(reject);
+      });
+    }
+    out.push({
+      name: raw.name || "datei",
+      size: raw.size || 0,
+      mime_type: raw.type || "application/octet-stream",
+      path
+    });
+  }
+  return out;
+}
+
+$("testSaveBtn")?.addEventListener("click", async () => {
+  if (!isAdmin() || saving) return;
+  const title = ($("tfTitle").value || "").trim();
+  const exam_date = $("tfDate").value;
+  if (!title || !exam_date) { toast("Titel und Datum sind Pflicht."); return; }
+  saving = true;
+  $("testSaveBtn").disabled = true;
+  $("testSaveBtn").textContent = "Speichern …";
+  try {
+    let files = [];
+    if (testEditingId) {
+      const prev = testItems.find(x => x.id === testEditingId);
+      files = Array.isArray(prev?.files) ? [...prev.files] : [];
+    }
+    if (testFiles.length) {
+      const uploaded = await uploadTestFiles(testFiles);
+      files = files.concat(uploaded);
+    }
+    const links = [
+      ...testLearnLinks.map(L => ({ url: L.url, label: L.label, type: "learn" })),
+      ...testGenLinks.map(L => ({ url: L.url, label: L.label, type: "general" }))
+    ];
+    const payload = {
+      title,
+      subject: ($("tfSubject").value || "").trim() || null,
+      kind: $("tfKind").value === "schularbeit" ? "schularbeit" : "test",
+      exam_date,
+      stoff: ($("tfStoff").value || "").trim() || null,
+      links,
+      files,
+      created_by: user.id,
+      created_by_email: user.email,
+      created_by_name: toName(user.email)
+    };
+    if (testEditingId) {
+      const { error } = await sb.from(TESTS_TABLE).update({
+        title: payload.title,
+        subject: payload.subject,
+        kind: payload.kind,
+        exam_date: payload.exam_date,
+        stoff: payload.stoff,
+        links: payload.links,
+        files: payload.files
+      }).eq("id", testEditingId);
+      if (error) throw error;
+      toast("Gespeichert.");
+    } else {
+      const { error } = await sb.from(TESTS_TABLE).insert(payload);
+      if (error) throw error;
+      toast("Eingetragen.");
+      try {
+        const kindL = payload.kind === "schularbeit" ? "Schularbeit" : "Test";
+        await callNotifyFunction("send-class-notification", {
+          title: `${kindL}: ${payload.title}`,
+          body: `${payload.subject || "Fach"} · ${payload.exam_date}${payload.stoff ? " · " + payload.stoff.slice(0, 80) : ""}`,
+          tag: "test-new"
+        });
+      } catch {}
+    }
+    hideSheet("testSheet", "testScrim");
+    await loadTests();
+  } catch (e) {
+    toast(e.message || String(e));
+  } finally {
+    saving = false;
+    $("testSaveBtn").disabled = false;
+    $("testSaveBtn").textContent = testEditingId ? "Speichern" : "Hinzufügen";
+  }
+});
+
 
 /* ─── Files + Preview ─── */
 async function asBrowserBlob(file) {
@@ -3024,6 +3349,7 @@ function subscribeAll() {
   const dPersonal = rtDebounce(() => loadPersonal(), 200);
   const dClass = rtDebounce(() => loadClass(), 200);
   const dSu = rtDebounce(() => loadUnterlagen(), 200);
+  const dTests = rtDebounce(() => loadTests(), 200);
   const dPerm = rtDebounce(() => { loadPermissions(); if (isAdmin()) loadAdminUsers(); }, 200);
   const dFiles = rtDebounce(() => { loadPersonal(); loadClass(); }, 300);
   const dComments = rtDebounce(() => { if (view === "class") loadClass(); if (view === "personal") loadPersonal(); }, 250);
@@ -3035,6 +3361,7 @@ function subscribeAll() {
   channels.push(sb.channel("rt-class").on("postgres_changes", { event: "*", schema: "public", table: CLASS_TABLE }, dClass).subscribe());
   channels.push(sb.channel("rt-comp").on("postgres_changes", { event: "*", schema: "public", table: COMP_TABLE }, dClass).subscribe());
   channels.push(sb.channel("rt-su").on("postgres_changes", { event: "*", schema: "public", table: SU_TABLE }, dSu).subscribe());
+  channels.push(sb.channel("rt-tests").on("postgres_changes", { event: "*", schema: "public", table: TESTS_TABLE }, dTests).subscribe());
   channels.push(sb.channel("rt-perm").on("postgres_changes", { event: "*", schema: "public", table: PERM_TABLE }, dPerm).subscribe());
   channels.push(sb.channel("rt-files").on("postgres_changes", { event: "*", schema: "public", table: FILE_TABLE }, dFiles).subscribe());
   channels.push(sb.channel("rt-sol").on("postgres_changes", { event: "*", schema: "public", table: SOL_TABLE }, dClass).subscribe());
