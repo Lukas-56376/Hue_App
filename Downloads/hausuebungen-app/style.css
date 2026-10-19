@@ -425,10 +425,43 @@ input:-webkit-autofill:focus {
   border-color: color-mix(in srgb, var(--green-fill) 30%, var(--rule));
   box-shadow: inset 4px 0 0 var(--green-fill), var(--shadow);
 }
-.row.done .title, .class-card.done h3 {
-  text-decoration: line-through;
+.row.done .title, .class-card.done h3, .class-card.done .title {
+  text-decoration: none;
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.row.done .subject, .class-card.done .subject {
+  opacity: 0.85;
+}
+.class-card.done .solutions-label,
+.class-card.done .field-help,
+.class-card.done .solutions-list,
+.class-card.done .sol-upload-label,
+.class-card.done .solution-by,
+.class-card.done .small-btn {
+  text-decoration: none !important;
+  opacity: 1;
+}
+.class-card .field-help {
+  text-decoration: none !important;
   color: var(--ink-3);
 }
+.solutions-empty {
+  margin: 4px 0 10px;
+  font-size: 14px;
+  color: var(--ink-3);
+  text-decoration: none !important;
+  font-style: normal;
+}
+.sol-upload-label {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  text-decoration: none !important;
+  color: var(--ink) !important;
+}
+
 
 .box {
   width: 26px; height: 26px; border-radius: 8px;
@@ -564,10 +597,13 @@ button.small-btn[data-done="1"] {
 
 .solutions-label {
   margin-top: var(--s4);
-  font-size: 12px; font-weight: 700;
-  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--purple);
+  text-decoration: none !important;
 }
 
 .comment-form {

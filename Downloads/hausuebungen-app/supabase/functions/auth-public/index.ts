@@ -260,6 +260,25 @@ Deno.serve(async req => {
     }
 
     
+    
+    if (action === "check_login_rate") {
+      const ip = clientIp(req, body);
+      const windowMs = 10 * 60 * 1000;
+      const since = new Date(Date.now() - windowMs).toISOString();
+      let count = 0;
+      if (ip) {
+        const { data } = await admin.from("ip_logs")
+          .select("id, created_at")
+          .eq("ip", ip)
+          .eq("action", "login_failed")
+          .gte("created_at", since);
+        count = (data || []).length;
+      }
+      const limit = 5;
+      const blocked = count >= limit;
+      return json({ ok: true, count, limit, blocked, window_minutes: 10, ip: ip || null });
+    }
+
     if (action === "log_session") {
       const ip = clientIp(req, body);
       await assertNotBanned(ip);

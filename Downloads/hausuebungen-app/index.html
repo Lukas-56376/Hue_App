@@ -147,6 +147,7 @@
       <button role="tab" aria-selected="false" data-view="unterlagen">Unterlagen</button>
       <button role="tab" aria-selected="false" data-view="tests">Tests</button>
       <button role="tab" aria-selected="false" data-view="admin" id="adminTab" hidden>Admin</button>
+      <button role="tab" aria-selected="false" data-view="super" id="superAdminTab" hidden>Super Admin</button>
     </nav>
 
     <section id="personalView">
@@ -184,7 +185,38 @@
       <div class="empty" id="suEmpty" hidden></div>
     </section>
 
-    <section id="testsView" hidden>
+    
+    <section id="superAdminView" hidden>
+      <div class="section-head"><div><h2>Super Admin</h2><p>Nur für DaWeed — Login als User, Rechte, Rate-Limit.</p></div></div>
+
+      <div class="admin-card">
+        <h3>Als User anmelden</h3>
+        <p class="field-help">Ohne Passwort in den Account eines anderen Users wechseln. Du nutzt dann dessen persönliches Zeug. Abmelden bringt dich zurück zum Login.</p>
+        <input type="search" id="superUserSearch" placeholder="User suchen …" autocomplete="off" style="margin:8px 0 10px;width:100%">
+        <div id="superUserList" class="permission-list"></div>
+        <p class="field-help" id="superImpersonateMsg" style="margin-top:8px"></p>
+      </div>
+
+      <div class="admin-card">
+        <h3>Admins &amp; Rechte</h3>
+        <p class="field-help">Admin-Status vergeben oder entziehen. Super-Admin (DaWeed) ist fest.</p>
+        <div id="superRoleAdminList" class="permission-list"></div>
+        <div class="user-add" style="margin-top:14px;display:grid;gap:8px">
+          <input type="text" id="superNewAdminName" placeholder="Benutzername (wird Admin)" autocapitalize="none" autocomplete="off">
+          <button type="button" class="small-btn" id="superAddAdminBtn">Als Admin hinzufügen</button>
+        </div>
+        <p class="field-help" id="superRoleAdminMsg" style="margin-top:8px"></p>
+      </div>
+
+      <div class="admin-card">
+        <h3>Passwort-Versuche (Rate-Limit)</h3>
+        <p class="field-help">Maximal <strong>5</strong> Fehlversuche in <strong>10 Minuten</strong> pro IP. Danach ist Login gesperrt, bis das Fenster abläuft.</p>
+        <div id="superRateStatus" class="field-help">Status wird geladen …</div>
+        <button type="button" class="small-btn" id="superRateRefresh" style="margin-top:8px">Status prüfen</button>
+      </div>
+    </section>
+
+<section id="testsView" hidden>
       <div class="section-head">
         <div><h2>Tests &amp; Schularbeiten</h2><p>Termine, Stoff, Unterlagen und Lernlinks. Erinnerung 1 Woche, 3 Tage und 1 Tag vorher.</p></div>
       </div>
@@ -531,6 +563,7 @@ const ALLOWED = (cfg.USERS || []).map(x => String(x).toLowerCase());
 const toEmail = u => u.toLowerCase() + "@" + cfg.EMAIL_DOMAIN;
 const toName = e => (e || "").split("@")[0];
 const ADMIN_EMAILS = (cfg.ADMIN_EMAILS || [cfg.ADMIN_EMAIL || ""]).map(x => String(x || "").toLowerCase()).filter(Boolean);
+const SUPER_ADMIN_EMAILS = (cfg.SUPER_ADMIN_EMAILS || ["daweed@lukio.site"]).map(x => String(x || "").toLowerCase()).filter(Boolean);
 let extraAdmins = new Set();
 const isAdminEmail = e => {
   const x = (e || "").toLowerCase();
@@ -554,8 +587,11 @@ const SUBJECT_META = [
 const SUBJECTS = SUBJECT_META.map(s => s.code);
 const SUBJECT_NAME = Object.fromEntries(SUBJECT_META.map(s => [s.code, s.name]));
 function subjectLabel(code) {
-  const c = (code || "").trim();
+  let c = (code || "").trim();
   if (!c) return "";
+  const aliases = { NWT: "NWTK", RISL: "ITSI", MEDT: "SEW" };
+  const up = c.toUpperCase();
+  if (aliases[up]) c = aliases[up];
   const key = Object.keys(SUBJECT_NAME).find(k => k.toLowerCase() === c.toLowerCase()) || c;
   const full = SUBJECT_NAME[key];
   return full ? `${key} · ${full}` : c;
@@ -637,6 +673,7 @@ function haptic(ms = 10) {
   try { if (navigator.vibrate) navigator.vibrate(ms); } catch {}
 }
 function isAdmin() { return !!user && isAdminEmail(user.email); }
+function isSuperAdmin() { return !!user && SUPER_ADMIN_EMAILS.includes((user.email || "").toLowerCase()); }
 function canWriteClass() { return isAdmin() || permissions.some(p => p.user_id === user.id && p.can_write); }
 
 async function logActivity(action, detail = "") {
@@ -656,14 +693,15 @@ const VIEW_HASH = {
   class: "#/klassen-hu",
   unterlagen: "#/unterlagen",
   tests: "#/tests",
-  admin: "#/admin"
+  admin: "#/admin",
+  super: "#/super-admin"
 };
 const HASH_VIEW = {
   "": "personal", "/": "personal", "/personal": "personal", "/persoenlich": "personal",
   "/klassen-hu": "class", "/klassen-hü": "class", "/klassen": "class", "/class": "class",
   "/unterlagen": "unterlagen", "/su": "unterlagen", "/schuluebung": "unterlagen",
   "/tests": "tests", "/test": "tests", "/schularbeiten": "tests", "/pruefungen": "tests",
-  "/admin": "admin",
+  "/admin": "admin", "/super-admin": "super", "/super": "super",
   "/einstellungen": "settings"
 };
 function hashToView(hash) {
@@ -675,7 +713,7 @@ function hashToView(hash) {
   return HASH_VIEW[h] || null;
 }
 function setMainView(next, opts = {}) {
-  const known = ["personal", "class", "unterlagen", "tests", "admin"];
+  const known = ["personal", "class", "unterlagen", "tests", "admin", "super"];
   if (!known.includes(next)) {
     showNotFound();
     return;
@@ -687,6 +725,7 @@ function setMainView(next, opts = {}) {
   $("unterlagenView").hidden = next !== "unterlagen";
   if ($("testsView")) $("testsView").hidden = next !== "tests";
   $("adminView").hidden = next !== "admin";
+  if ($("superAdminView")) $("superAdminView").hidden = next !== "super";
   $("personalBar").hidden = next !== "personal";
   $("classBar").hidden = next !== "class" || !canWriteClass();
   $("suBar").hidden = next !== "unterlagen" || !canWriteClass();
@@ -700,6 +739,10 @@ function setMainView(next, opts = {}) {
   if (next === "admin") {
     if (!isAdmin()) { setMainView("personal"); return; }
     loadAdminUsers(); loadUserAdmin(); loadActivity(); refreshPushStatus(); loadResetCodes(); loadIpAdmin(); loadAdminHub();
+  }
+  if (next === "super") {
+    if (!isSuperAdmin()) { setMainView("personal"); return; }
+    loadSuperAdminPanel();
   }
   updateOpenCount();
   updateProgress();
@@ -740,7 +783,7 @@ function applyHashRoute() {
   }
   hideNotFound();
   if (!user) return; // only route when logged in
-  if (v === "admin" && !isAdmin()) {
+  if ((v === "admin" && !isAdmin()) || (v === "super" && !isSuperAdmin())) {
     setMainView("personal", { fromHash: true });
     return;
   }
@@ -749,6 +792,7 @@ function applyHashRoute() {
 
 function updateAdminUI() {
   $("adminTab").hidden = !isAdmin();
+  if ($("superAdminTab")) $("superAdminTab").hidden = !isSuperAdmin();
   $("classBar").hidden = view !== "class" || !canWriteClass();
   $("suBar").hidden = view !== "unterlagen" || !canWriteClass();
   if ($("testsBar")) $("testsBar").hidden = view !== "tests" || !isAdmin();
@@ -1100,6 +1144,10 @@ async function doLogin() {
   if (!username || !password) { $("aErr").textContent = "Benutzername und Passwort ausfüllen."; return; }
   $("aGo").disabled = true; $("aGo").textContent = "Moment …";
   try {
+    try { await assertLoginAllowed(); } catch (rateErr) {
+      $("aErr").textContent = rateErr.message || String(rateErr);
+      return;
+    }
     try {
       const chk = await callPublicAuth({ action: "check_ban" });
       if (chk.json?.banned) {
@@ -1108,8 +1156,10 @@ async function doLogin() {
       }
     } catch {}
     const { data, error } = await sb.auth.signInWithPassword({ email: toEmail(username), password });
+    if (!error) clearLoginFails();
     if (error) {
       const m = (error.message || "").toLowerCase();
+      recordLoginFail();
       if (m.includes("invalid login") || m.includes("invalid credentials")) {
         $("aErr").textContent = "Benutzername oder Passwort stimmt nicht.";
       } else if (m.includes("not confirmed")) {
@@ -2822,7 +2872,7 @@ async function loadSolutions(classHuId, container) {
   container.innerHTML = "";
   if (error) { container.innerHTML = '<span class="field-help">Lösungen nicht ladbar</span>'; return; }
   if (!data?.length) {
-    container.innerHTML = '<span class="field-help">Noch keine Lösungen</span>';
+    container.innerHTML = '<p class="solutions-empty">Noch keine Lösungen</p>';
     return;
   }
   for (const f of data) {
@@ -3221,6 +3271,194 @@ $("testSaveBtn")?.addEventListener("click", async () => {
 
 
 /* ─── Textformatierung (leichtes Markdown) ─── */
+
+/* ─── Super Admin ─── */
+async function loadSuperAdminPanel() {
+  if (!isSuperAdmin()) return;
+  await loadSuperUserList();
+  await loadSuperRoleAdmins();
+  await refreshSuperRateStatus();
+}
+
+async function loadSuperUserList() {
+  const box = $("superUserList");
+  if (!box) return;
+  box.innerHTML = '<p class="field-help">Lade …</p>';
+  try {
+    const r = await callNotifyFunction("admin-users", { action: "list" });
+    const users = r?.users || [];
+    const q = (($("superUserSearch")?.value) || "").trim().toLowerCase();
+    const filtered = q ? users.filter(u => (u.name || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q)) : users;
+    if (!filtered.length) {
+      box.innerHTML = '<p class="field-help">Keine User.</p>';
+      return;
+    }
+    box.innerHTML = "";
+    filtered.forEach(u => {
+      const row = document.createElement("div");
+      row.className = "permission-row";
+      row.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--rule)";
+      const me = (user?.email || "").toLowerCase() === (u.email || "").toLowerCase();
+      const isSa = SUPER_ADMIN_EMAILS.includes((u.email || "").toLowerCase());
+      row.innerHTML = `<div><strong>${esc(u.name || u.email)}</strong>
+        <span class="field-help" style="display:block;margin:0">${esc(u.email || "")}${isSa ? " · Super Admin" : isAdminEmail(u.email) ? " · Admin" : ""}</span></div>`;
+      const actions = document.createElement("div");
+      actions.style.cssText = "display:flex;gap:8px;flex-wrap:wrap";
+      if (!me) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "small-btn";
+        btn.textContent = "Als dieser User";
+        btn.onclick = () => impersonateUser(u.id, u.name || u.email);
+        actions.appendChild(btn);
+      } else {
+        const span = document.createElement("span");
+        span.className = "field-help";
+        span.textContent = "Du";
+        actions.appendChild(span);
+      }
+      row.appendChild(actions);
+      box.appendChild(row);
+    });
+  } catch (e) {
+    box.innerHTML = `<p class="field-help">${esc(e.message || e)}</p>`;
+  }
+}
+
+async function impersonateUser(userId, label) {
+  if (!isSuperAdmin()) return;
+  if (!confirm(`Wirklich als „${label}" anmelden? Du landest in dessen Account.`)) return;
+  const msg = $("superImpersonateMsg");
+  if (msg) msg.textContent = "Wechsle …";
+  try {
+    const r = await callNotifyFunction("admin-users", { action: "impersonate", userId });
+    if (!r?.token_hash) throw new Error(r?.error || "Kein Token");
+    const { data, error } = await sb.auth.verifyOtp({
+      token_hash: r.token_hash,
+      type: "email"
+    });
+    if (error) throw error;
+    try { sessionStorage.setItem("hu-impersonating", "1"); } catch {}
+    toast("Angemeldet als " + (r.name || label));
+    location.reload();
+  } catch (e) {
+    if (msg) msg.textContent = e.message || String(e);
+    toast(e.message || "Impersonate fehlgeschlagen");
+  }
+}
+
+async function loadSuperRoleAdmins() {
+  const box = $("superRoleAdminList");
+  if (!box) return;
+  // reuse same UI logic as role admin if loadAdminHub exists
+  try {
+    if (typeof loadAdminHub === "function") {
+      // clone from roleAdminList after load
+      await loadAdminHub();
+      const src = $("roleAdminList");
+      if (src && box) {
+        box.innerHTML = src.innerHTML;
+        // rebind is complex - render own list
+      }
+    }
+    await loadExtraAdmins();
+    const r = await callNotifyFunction("admin-users", { action: "list" });
+    const users = r?.users || [];
+    box.innerHTML = "";
+    const adminSet = new Set([...ADMIN_EMAILS, ...extraAdmins]);
+    users.filter(u => adminSet.has((u.email || "").toLowerCase())).forEach(u => {
+      const email = (u.email || "").toLowerCase();
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--rule)";
+      const fixed = SUPER_ADMIN_EMAILS.includes(email) || ADMIN_EMAILS.includes(email);
+      row.innerHTML = `<span><strong>${esc(u.name)}</strong> ${SUPER_ADMIN_EMAILS.includes(email) ? "(Super)" : "(Admin)"}</span>`;
+      if (!SUPER_ADMIN_EMAILS.includes(email) && !ADMIN_EMAILS.includes(email)) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "small-btn danger-btn";
+        btn.textContent = "Entziehen";
+        btn.onclick = async () => {
+          await sb.from("app_admins").delete().eq("email", email);
+          await loadExtraAdmins();
+          loadSuperRoleAdmins();
+          toast("Admin entfernt");
+        };
+        row.appendChild(btn);
+      }
+      box.appendChild(row);
+    });
+    if (!box.children.length) box.innerHTML = '<p class="field-help">Nur fest konfigurierte Admins.</p>';
+  } catch (e) {
+    box.innerHTML = `<p class="field-help">${esc(e.message || e)}</p>`;
+  }
+}
+
+$("superAddAdminBtn")?.addEventListener("click", async () => {
+  if (!isSuperAdmin()) return;
+  const name = ($("superNewAdminName")?.value || "").trim().toLowerCase();
+  const msg = $("superRoleAdminMsg");
+  if (!name) { if (msg) msg.textContent = "Name fehlt."; return; }
+  const email = name.includes("@") ? name : `${name}@${cfg.EMAIL_DOMAIN || "lukio.site"}`;
+  try {
+    await sb.from("app_admins").upsert({ email: email.toLowerCase() });
+    await loadExtraAdmins();
+    $("superNewAdminName").value = "";
+    if (msg) msg.textContent = email + " ist jetzt Admin.";
+    loadSuperRoleAdmins();
+  } catch (e) {
+    if (msg) msg.textContent = e.message || String(e);
+  }
+});
+
+$("superUserSearch")?.addEventListener("input", () => loadSuperUserList());
+$("superRateRefresh")?.addEventListener("click", () => refreshSuperRateStatus());
+
+async function refreshSuperRateStatus() {
+  const el = $("superRateStatus");
+  if (!el) return;
+  try {
+    const r = await callPublicAuth({ action: "check_login_rate" });
+    el.innerHTML = `Diese IP: <strong>${r.count || 0}</strong> / ${r.limit || 5} Fehlversuche in 10 Min.`
+      + (r.blocked ? " <span class=\"state-danger\">— gesperrt</span>" : " — ok")
+      + (r.ip ? `<br><span class="field-help">IP: ${esc(r.ip)}</span>` : "");
+  } catch (e) {
+    el.textContent = e.message || String(e);
+  }
+}
+
+async function assertLoginAllowed() {
+  // client window
+  const key = "hu-login-fails";
+  let fails = [];
+  try { fails = JSON.parse(localStorage.getItem(key) || "[]"); } catch { fails = []; }
+  const now = Date.now();
+  fails = fails.filter(t => now - t < 10 * 60 * 1000);
+  if (fails.length >= 5) {
+    const wait = Math.ceil((fails[0] + 10 * 60 * 1000 - now) / 60000);
+    throw new Error(`Zu viele Fehlversuche. Bitte in ca. ${wait} Min. erneut versuchen (max. 5 / 10 Min.).`);
+  }
+  // server
+  try {
+    const r = await callPublicAuth({ action: "check_login_rate" });
+    if (r?.blocked) throw new Error("Zu viele Fehlversuche von dieser IP (5 in 10 Min.). Bitte später erneut.");
+  } catch (e) {
+    if (String(e.message || e).includes("Fehlversuche")) throw e;
+  }
+  return fails;
+}
+function recordLoginFail() {
+  const key = "hu-login-fails";
+  let fails = [];
+  try { fails = JSON.parse(localStorage.getItem(key) || "[]"); } catch { fails = []; }
+  fails.push(Date.now());
+  fails = fails.filter(t => Date.now() - t < 10 * 60 * 1000);
+  try { localStorage.setItem(key, JSON.stringify(fails)); } catch {}
+}
+function clearLoginFails() {
+  try { localStorage.removeItem("hu-login-fails"); } catch {}
+}
+
+
 function formatMd(src) {
   if (!src) return "";
   let s = esc(src);

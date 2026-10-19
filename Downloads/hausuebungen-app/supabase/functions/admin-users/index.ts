@@ -7,8 +7,10 @@ const cors = {
 };
 
 const ADMINS = ["daweed@lukio.site", "nico@lukio.site"];
+const SUPER_ADMINS = ["daweed@lukio.site"];
 const isAdminEmail = (e: string) => ADMINS.includes((e || "").toLowerCase());
-const ADMIN = ADMINS[0]; // primary for rename/delete guards
+const isSuperAdminEmail = (e: string) => SUPER_ADMINS.includes((e || "").toLowerCase());
+const ADMIN = ADMINS[0];
 const DOMAIN = "lukio.site";
 
 const url = Deno.env.get("SUPABASE_URL")!;
@@ -119,6 +121,45 @@ Deno.serve(async req => {
       const { error, count } = await admin.from("push_subscriptions").delete({ count: "exact" }).eq("user_id", targetId);
       if (error) throw error;
       return json({ ok: true, removed: count || 0 });
+    }
+
+    if (action === "impersonate") {
+      if (!isSuperAdminEmail(user.email || "")) return json({ error: "Nur Super-Admin." }, 403);
+      const id = String(body.userId || "");
+      const name = normName(body.username || "");
+      let targetEmail = "";
+      let targetId = id;
+      if (targetId) {
+        const { data: target } = await admin.auth.admin.getUserById(targetId);
+        targetEmail = target.user?.email || "";
+      } else if (name) {
+        targetEmail = `${name}@${DOMAIN}`;
+        const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+        const found = (data?.users || []).find(u => (u.email || "").toLowerCase() === targetEmail);
+        if (!found) return json({ error: "User nicht gefunden." }, 404);
+        targetId = found.id;
+        targetEmail = found.email || targetEmail;
+      } else {
+        return json({ error: "User fehlt." }, 400);
+      }
+      if (!targetEmail) return json({ error: "Keine E-Mail." }, 400);
+      if ((targetEmail || "").toLowerCase() === (user.email || "").toLowerCase()) {
+        return json({ error: "Du bist bereits dieser User." }, 400);
+      }
+      const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+        type: "magiclink",
+        email: targetEmail
+      });
+      if (linkErr) throw linkErr;
+      const hashed = linkData?.properties?.hashed_token;
+      if (!hashed) return json({ error: "Token konnte nicht erzeugt werden." }, 500);
+      return json({
+        ok: true,
+        token_hash: hashed,
+        email: targetEmail,
+        user_id: targetId,
+        name: targetEmail.split("@")[0]
+      });
     }
 
     return json({ error: "Unbekannte Aktion." }, 400);

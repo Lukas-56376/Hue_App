@@ -4,6 +4,7 @@ window.CONFIG = {
   EMAIL_DOMAIN: "lukio.site",
   ADMIN_EMAIL: "daweed@lukio.site",
   ADMIN_EMAILS: ["daweed@lukio.site", "nico@lukio.site"],
+  SUPER_ADMIN_EMAILS: ["daweed@lukio.site"],
   USERS: 
   [
     "DaWeed",
