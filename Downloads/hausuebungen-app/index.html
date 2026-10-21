@@ -235,8 +235,16 @@
 
       <div class="admin-card">
         <h3>Nachricht an User</h3>
-        <p class="field-help">Beim nächsten Besuch sieht der User die Nachricht und kann antworten.</p>
-        <input type="text" id="superMsgUser" placeholder="Benutzername" autocapitalize="none" autocomplete="off" style="margin-bottom:8px;width:100%">
+        <p class="field-help">Komma trennt mehrere User. Checkbox = alle. Beim nächsten Besuch Modal + Antwort.</p>
+        <div class="check-row" style="margin-bottom:8px"><input type="checkbox" id="superMsgAll"><label for="superMsgAll" style="margin:0">An alle User</label></div>
+        <input type="text" id="superMsgUser" list="superMsgUserList" placeholder="user1, user2, …" autocapitalize="none" autocomplete="off" style="margin-bottom:8px;width:100%">
+        <datalist id="superMsgUserList"></datalist>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+          <button type="button" class="small-btn msg-tpl" data-tpl="Test verschoben – neuer Termin folgt.">Test verschoben</button>
+          <button type="button" class="small-btn msg-tpl" data-tpl="Bitte HÜ bis morgen erledigen.">HÜ Erinnerung</button>
+          <button type="button" class="small-btn msg-tpl" data-tpl="Wichtige Info von der Klasse – bitte lesen und ggf. antworten.">Wichtige Info</button>
+          <button type="button" class="small-btn msg-tpl" data-tpl="Dein Account wurde geprüft. Bei Fragen antworte hier.">Account-Hinweis</button>
+        </div>
         <textarea id="superMsgBody" placeholder="Nachricht …" style="width:100%;min-height:80px"></textarea>
         <button type="button" class="small-btn" id="superMsgSend" style="margin-top:8px">Nachricht senden</button>
         <p class="field-help" id="superMsgStatus" style="margin-top:8px"></p>
@@ -3534,29 +3542,55 @@ async function dismissAdminMsg(sendReply) {
 $("adminMsgSend")?.addEventListener("click", () => dismissAdminMsg(true));
 $("adminMsgSkip")?.addEventListener("click", () => dismissAdminMsg(false));
 
+document.querySelectorAll(".msg-tpl").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const ta = $("superMsgBody");
+    if (ta) ta.value = btn.dataset.tpl || "";
+  });
+});
+$("superMsgAll")?.addEventListener("change", () => {
+  const on = !!$("superMsgAll")?.checked;
+  if ($("superMsgUser")) {
+    $("superMsgUser").disabled = on;
+    if (on) $("superMsgUser").value = "";
+  }
+});
 $("superMsgSend")?.addEventListener("click", async () => {
   if (!isSuperAdmin()) return;
-  const name = ($("superMsgUser")?.value || "").trim().toLowerCase();
   const body = ($("superMsgBody")?.value || "").trim();
   const st = $("superMsgStatus");
-  if (!name || !body) { if (st) st.textContent = "User und Nachricht nötig."; return; }
-  const email = name.includes("@") ? name : name + "@" + (cfg.EMAIL_DOMAIN || "lukio.site");
+  if (!body) { if (st) st.textContent = "Nachricht fehlt."; return; }
   try {
-    let toId = null;
-    try {
-      const data = await adminUsersApi({ action: "list" });
-      const found = (data.users || []).find(u => (u.email || "").toLowerCase() === email.toLowerCase());
-      toId = found?.id || null;
-    } catch {}
-    const { error } = await sb.from("admin_messages").insert({
-      to_user_id: toId,
-      to_email: email.toLowerCase(),
-      from_email: user.email,
-      body
-    });
-    if (error) throw error;
-    await logSuper("admin_message", email, { body: body.slice(0, 100) });
-    if (st) st.textContent = "Gesendet an " + email;
+    const data = await adminUsersApi({ action: "list" });
+    const users = data.users || [];
+    const dl = $("superMsgUserList");
+    if (dl) dl.innerHTML = users.map(u => `<option value="${esc(u.name || "")}">`).join("");
+    let targets = [];
+    if ($("superMsgAll")?.checked) {
+      targets = users.filter(u => (u.email || "").toLowerCase() !== (user.email || "").toLowerCase());
+    } else {
+      const raw = ($("superMsgUser")?.value || "").trim().toLowerCase();
+      if (!raw) { if (st) st.textContent = "User angeben oder „An alle“."; return; }
+      for (const p of raw.split(",").map(s => s.trim()).filter(Boolean)) {
+        const email = p.includes("@") ? p : p + "@" + (cfg.EMAIL_DOMAIN || "lukio.site");
+        const found = users.find(u => (u.email || "").toLowerCase() === email || (u.name || "").toLowerCase() === p);
+        targets.push(found || { email, name: p, id: null });
+      }
+    }
+    if (!targets.length) { if (st) st.textContent = "Keine Empfänger."; return; }
+    let ok = 0, fail = 0;
+    for (const t of targets) {
+      const email = (t.email || ((t.name || "") + "@" + (cfg.EMAIL_DOMAIN || "lukio.site"))).toLowerCase();
+      const { error } = await sb.from("admin_messages").insert({
+        to_user_id: t.id || null,
+        to_email: email,
+        from_email: user.email,
+        body
+      });
+      if (error) { fail++; console.warn(error); } else ok++;
+    }
+    if (typeof logSuper === "function") await logSuper("admin_message", ok + " Empfänger", { body: body.slice(0, 100) });
+    if (st) st.textContent = "Gesendet: " + ok + (fail ? " · Fehler: " + fail : "");
     $("superMsgBody").value = "";
     loadSuperMessages();
   } catch (e) {
@@ -3567,17 +3601,25 @@ $("superMsgSend")?.addEventListener("click", async () => {
 async function loadSuperMessages() {
   const box = $("superMsgList");
   if (!box || !isSuperAdmin()) return;
-  const { data } = await sb.from("admin_messages").select("*").order("created_at", { ascending: false }).limit(30);
+  try {
+    const data = await adminUsersApi({ action: "list" });
+    const dl = $("superMsgUserList");
+    if (dl) dl.innerHTML = (data.users || []).map(u => `<option value="${esc(u.name || "")}">`).join("");
+  } catch {}
+  const { data } = await sb.from("admin_messages").select("*").order("created_at", { ascending: false }).limit(40);
   box.innerHTML = "";
   if (!data?.length) { box.innerHTML = '<p class="field-help">Noch keine Nachrichten.</p>'; return; }
   data.forEach(m => {
     const row = document.createElement("div");
     row.style.cssText = "padding:10px 0;border-bottom:1px solid var(--rule)";
     const to = (m.to_email || "").split("@")[0];
+    let status = "ungelesen";
+    if (m.read_at) status = "gelesen " + new Date(m.read_at).toLocaleString("de-AT");
+    if (m.reply) status = "beantwortet " + (m.replied_at ? new Date(m.replied_at).toLocaleString("de-AT") : "");
     row.innerHTML = `<strong>→ ${esc(to)}</strong>
       <div class="field-help" style="margin:4px 0">${esc(m.body)}</div>
-      ${m.reply ? `<div style="margin-top:6px;padding:8px;background:var(--soft-2);border-radius:10px"><strong>Antwort:</strong> ${esc(m.reply)}</div>` : `<span class="field-help">${m.read_at ? "gelesen" : "ungelesen"}</span>`}
-      <span class="field-help" style="display:block">${esc(new Date(m.created_at).toLocaleString("de-AT"))}</span>`;
+      ${m.reply ? `<div style="margin-top:6px;padding:8px;background:var(--soft-2);border-radius:10px"><strong>Antwort:</strong> ${esc(m.reply)}</div>` : ""}
+      <span class="field-help" style="display:block">${esc(status)} · gesendet ${esc(new Date(m.created_at).toLocaleString("de-AT"))}</span>`;
     box.appendChild(row);
   });
 }
