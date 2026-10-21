@@ -70,9 +70,36 @@ Deno.serve(async req => {
       const id = String(body.userId || "");
       const password = String(body.password || "");
       if (!id || password.length < 6) return json({ error: "User und Passwort (min. 6) nötig." }, 400);
-      const { error } = await admin.auth.admin.updateUserById(id, { password });
+      const { error } = await admin.auth.admin.updateUserById(id, {
+        password,
+        user_metadata: { otp_pending: false }
+      });
       if (error) throw error;
       return json({ ok: true });
+    }
+
+    if (action === "otp_password") {
+      const id = String(body.userId || "");
+      if (!id) return json({ error: "userId fehlt." }, 400);
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+      let password = "";
+      const arr = new Uint8Array(10);
+      crypto.getRandomValues(arr);
+      for (let i = 0; i < 10; i++) password += chars[arr[i] % chars.length];
+      const { data: target, error: getErr } = await admin.auth.admin.getUserById(id);
+      if (getErr || !target?.user) return json({ error: "User nicht gefunden." }, 404);
+      if (isAdminEmail(target.user.email || "") && !isSuperAdminEmail(user.email || "")) {
+        return json({ error: "Admin-OTP nur durch Super-Admin." }, 403);
+      }
+      const meta = { ...(target.user.user_metadata || {}), otp_pending: true, otp_created_at: new Date().toISOString() };
+      const { error } = await admin.auth.admin.updateUserById(id, { password, user_metadata: meta });
+      if (error) throw error;
+      return json({
+        ok: true,
+        password,
+        email: target.user.email,
+        name: (target.user.email || "").split("@")[0]
+      });
     }
 
     if (action === "rename") {

@@ -37,6 +37,31 @@
   </div>
 </section>
 
+<div id="otpForceModal" class="msg-modal-scrim" hidden>
+  <div class="msg-modal" role="dialog">
+    <p class="state-eyebrow">Sicherheit</p>
+    <h2>Neues Passwort setzen</h2>
+    <p class="field-help">Du hast dich mit einem Einmal-Passwort angemeldet. Bitte setze jetzt ein eigenes Passwort.</p>
+    <div class="field"><label for="otpNewPass">Neues Passwort</label><input type="password" id="otpNewPass" autocomplete="new-password" placeholder="min. 6 Zeichen"></div>
+    <div class="field"><label for="otpNewPass2">Wiederholen</label><input type="password" id="otpNewPass2" autocomplete="new-password" placeholder="nochmal"></div>
+    <p class="err" id="otpForceErr"></p>
+    <div class="actions" style="justify-content:flex-end"><button type="button" class="btn-primary" id="otpForceSave">Speichern</button></div>
+  </div>
+</div>
+<div id="adminMsgModal" class="msg-modal-scrim" hidden>
+  <div class="msg-modal" role="dialog" aria-labelledby="adminMsgTitle">
+    <p class="state-eyebrow">Nachricht vom Admin</p>
+    <h2 id="adminMsgTitle">Nachricht</h2>
+    <div class="msg-body" id="adminMsgBody"></div>
+    <label for="adminMsgReply" class="field-help">Deine Antwort</label>
+    <textarea id="adminMsgReply" placeholder="Antwort schreiben …"></textarea>
+    <div class="actions" style="justify-content:flex-end;gap:10px">
+      <button type="button" class="btn-secondary" id="adminMsgSkip">Später</button>
+      <button type="button" class="btn-primary" id="adminMsgSend">Antwort senden</button>
+    </div>
+  </div>
+</div>
+
 <section id="maintScreen" class="state-screen state-maint" hidden>
   <div class="state-wrap">
     <div class="state-icon maint-ico" aria-hidden="true">
@@ -209,6 +234,22 @@
       </div>
 
       <div class="admin-card">
+        <h3>Nachricht an User</h3>
+        <p class="field-help">Beim nächsten Besuch sieht der User die Nachricht und kann antworten.</p>
+        <input type="text" id="superMsgUser" placeholder="Benutzername" autocapitalize="none" autocomplete="off" style="margin-bottom:8px;width:100%">
+        <textarea id="superMsgBody" placeholder="Nachricht …" style="width:100%;min-height:80px"></textarea>
+        <button type="button" class="small-btn" id="superMsgSend" style="margin-top:8px">Nachricht senden</button>
+        <p class="field-help" id="superMsgStatus" style="margin-top:8px"></p>
+        <h4 style="margin-top:16px">Offene / beantwortete</h4>
+        <div id="superMsgList" class="permission-list"></div>
+      </div>
+      <div class="admin-card">
+        <h3>Super-Admin-Log</h3>
+        <p class="field-help">Jede Super-Admin-Aktion wird hier protokolliert.</p>
+        <div id="superLogList" class="permission-list"></div>
+        <button type="button" class="small-btn" id="superLogRefresh" style="margin-top:8px">Aktualisieren</button>
+      </div>
+      <div class="admin-card">
         <h3>Passwort-Versuche (Rate-Limit)</h3>
         <p class="field-help">Maximal <strong>5</strong> Fehlversuche in <strong>10 Minuten</strong> pro IP. Danach ist Login gesperrt, bis das Fenster abläuft.</p>
         <div id="superRateStatus" class="field-help">Status wird geladen …</div>
@@ -228,7 +269,7 @@
       <div class="section-head"><div><h2>Admin</h2><p>Schreibrechte & Aktivität.</p></div></div>
       <div class="admin-card">
         <h3>Benutzer</h3>
-        <p class="field-help">Anlegen, umbenennen, Passwort ändern oder löschen. Speichert in Supabase Auth.</p>
+        <p class="field-help">Anlegen, umbenennen, Passwort ändern, Einmal-Passwort (OTP) oder löschen. Speichert in Supabase Auth.</p>
         <input type="search" id="userSearch" placeholder="Benutzer suchen …" autocomplete="off" style="margin:8px 0 10px;width:100%">
         <div id="userAdminList" class="permission-list"></div>
         <div class="user-add" style="margin-top:14px;display:grid;gap:8px">
@@ -237,6 +278,12 @@
           <button type="button" class="small-btn" id="addUserBtn">Benutzer anlegen</button>
         </div>
         <p class="field-help" id="userAdminMsg" style="margin-top:8px"></p>
+      </div>
+      <div class="admin-card">
+        <h3>User sperren</h3>
+        <p class="field-help">Gesperrte User können sich nicht anmelden (alle Admins).</p>
+        <div id="userBanList" class="permission-list"></div>
+        <p class="field-help" id="userBanMsg" style="margin-top:8px"></p>
       </div>
       <div class="admin-card">
         <h3>IP-Log &amp; Bans</h3>
@@ -571,21 +618,33 @@ const isAdminEmail = e => {
 };
 const MAX_BYTES = cfg.MAX_UPLOAD_BYTES || 10 * 1024 * 1024 * 1024;
 const SUBJECT_META = [
-  { code: "GGP", name: "Geografie, Geschichte und politische Bildung" },
-  { code: "PH", name: "Physik" },
-  { code: "SEW", name: "Software Entwicklung" },
-  { code: "NWTK", name: "Netzwerktechnik" },
-  { code: "D", name: "Deutsch" },
-  { code: "SOPK", name: "Sozial- und Personalkompetenz" },
-  { code: "AM", name: "Angewandte Mathematik" },
-  { code: "GETE", name: "Grundlagen der Elektrotechnik und Elektronik" },
-  { code: "E", name: "Englisch" },
-  { code: "GINF", name: "Grundlagen der Informatik" },
-  { code: "ITSI", name: "IT-Sicherheit" },
-  { code: "SECLAB", name: "Security Laboratory" }
+  { code: "GGP", name: "Geografie, Geschichte und politische Bildung", light: "#0a7a4a", dark: "#34d399" },
+  { code: "PH", name: "Physik", light: "#2563eb", dark: "#60a5fa" },
+  { code: "SEW", name: "Software Entwicklung", light: "#7c3aed", dark: "#a78bfa" },
+  { code: "NWTK", name: "Netzwerktechnik", light: "#0891b2", dark: "#22d3ee" },
+  { code: "D", name: "Deutsch", light: "#b45309", dark: "#fbbf24" },
+  { code: "SOPK", name: "Sozial- und Personalkompetenz", light: "#db2777", dark: "#f472b6" },
+  { code: "AM", name: "Angewandte Mathematik", light: "#c2410c", dark: "#fb923c" },
+  { code: "GETE", name: "Grundlagen der Elektrotechnik und Elektronik", light: "#ca8a04", dark: "#facc15" },
+  { code: "E", name: "Englisch", light: "#1d4ed8", dark: "#93c5fd" },
+  { code: "GINF", name: "Grundlagen der Informatik", light: "#4f46e5", dark: "#818cf8" },
+  { code: "ITSI", name: "IT-Sicherheit", light: "#b91c1c", dark: "#f87171" },
+  { code: "SECLAB", name: "Security Laboratory", light: "#9f1239", dark: "#fb7185" }
 ];
 const SUBJECTS = SUBJECT_META.map(s => s.code);
 const SUBJECT_NAME = Object.fromEntries(SUBJECT_META.map(s => [s.code, s.name]));
+const SUBJECT_COLOR = Object.fromEntries(SUBJECT_META.map(s => [s.code, { light: s.light, dark: s.dark }]));
+function subjectColor(code) {
+  let c = (code || "").trim();
+  const aliases = { NWT: "NWTK", RISL: "ITSI", MEDT: "SEW" };
+  const up = c.toUpperCase();
+  if (aliases[up]) c = aliases[up];
+  const key = Object.keys(SUBJECT_COLOR).find(k => k.toLowerCase() === c.toLowerCase());
+  const pair = key ? SUBJECT_COLOR[key] : null;
+  if (!pair) return "var(--indigo)";
+  const dark = document.documentElement.getAttribute("data-theme") === "dark";
+  return dark ? pair.dark : pair.light;
+}
 function subjectLabel(code) {
   let c = (code || "").trim();
   if (!c) return "";
@@ -738,7 +797,7 @@ function setMainView(next, opts = {}) {
   if (next === "tests") loadTests();
   if (next === "admin") {
     if (!isAdmin()) { setMainView("personal"); return; }
-    loadAdminUsers(); loadUserAdmin(); loadActivity(); refreshPushStatus(); loadResetCodes(); loadIpAdmin(); loadAdminHub();
+    loadAdminUsers(); loadUserAdmin(); loadActivity(); refreshPushStatus(); loadResetCodes(); loadIpAdmin(); loadAdminHub(); loadUserBans();
   }
   if (next === "super") {
     if (!isSuperAdmin()) { setMainView("personal"); return; }
@@ -1010,12 +1069,20 @@ function showAuth() {
 }
 async function showApp(session) {
   user = session.user;
+  // refresh user metadata (OTP flag etc.)
+  try {
+    const { data: { user: fresh } } = await sb.auth.getUser();
+    if (fresh) user = fresh;
+  } catch {}
+  if (await checkUserBan()) return;
   $("auth").hidden = true;
   $("app").hidden = false;
   $("acctName").textContent = toName(user.email);
   fillSubjectSelect();
   await loadExtraAdmins();
   if (await blockIfMaintenance()) return;
+  await checkOtpPending();
+  await checkAdminMessages();
   await loadPublicNotices();
   await loadPermissions();
   await Promise.all([loadPersonal(), loadClass(), loadUnterlagen(), loadTests()]);
@@ -1024,6 +1091,13 @@ async function showApp(session) {
   updateAdminUI();
   setMainView("personal");
   maybeAskPushOnce();
+  // Re-check ban periodically while app is open
+  if (!window.__userBanTimer) {
+    window.__userBanTimer = setInterval(async () => {
+      if (!user) return;
+      try { await checkUserBan(); } catch {}
+    }, 30000);
+  }
 }
 
 async function callPublicAuth(payload) {
@@ -1156,7 +1230,14 @@ async function doLogin() {
       }
     } catch {}
     const { data, error } = await sb.auth.signInWithPassword({ email: toEmail(username), password });
-    if (!error) clearLoginFails();
+    if (!error) {
+      clearLoginFails();
+      user = data?.user || data?.session?.user || null;
+      if (user && await checkUserBan()) {
+        $("aErr").textContent = "Dieser Account ist gesperrt.";
+        return;
+      }
+    }
     if (error) {
       const m = (error.message || "").toLowerCase();
       recordLoginFail();
@@ -1924,7 +2005,9 @@ async function loadUserAdmin() {
       row.innerHTML = `<span style="min-width:90px">${esc(u.name)}${mine ? " <small>(Admin)</small>" : ""}</span>
         <button type="button" class="small-btn" data-act="rename" data-id="${u.id}" data-name="${esc(u.name)}">Name</button>
         <button type="button" class="small-btn" data-act="pass" data-id="${u.id}" data-name="${esc(u.name)}">Passwort</button>
-        ${mine ? "" : `<button type="button" class="small-btn danger-btn" data-act="del" data-id="${u.id}" data-name="${esc(u.name)}">Löschen</button>`}`;
+        <button type="button" class="small-btn" data-act="otp" data-id="${u.id}" data-name="${esc(u.name)}" title="Einmal-Passwort">OTP</button>
+        ${mine ? "" : `<button type="button" class="small-btn danger-btn" data-act="ban" data-id="${u.id}" data-name="${esc(u.name)}" data-email="${esc(u.email || "")}">Sperren</button>
+        <button type="button" class="small-btn danger-btn" data-act="del" data-id="${u.id}" data-name="${esc(u.name)}">Löschen</button>`}`;
       list.appendChild(row);
     }
     list.querySelectorAll("button[data-act]").forEach(btn => {
@@ -1941,6 +2024,39 @@ async function loadUserAdmin() {
             if (!pw) return;
             await adminUsersApi({ action: "password", userId: id, password: pw });
             toast("Passwort für " + name + " geändert.");
+          } else if (act === "otp") {
+            if (!confirm("Einmal-Passwort für " + name + " erzeugen? Das aktuelle Passwort wird ersetzt.")) return;
+            const r = await adminUsersApi({ action: "otp_password", userId: id });
+            const otp = r.password || "";
+            if (!otp) throw new Error("Kein OTP erzeugt");
+            try { await navigator.clipboard.writeText(otp); } catch {}
+            alert("Einmal-Passwort für " + name + ":\n\n" + otp + "\n\n(In Zwischenablage kopiert, falls möglich.)\n\nUser muss sich damit anmelden und sollte danach ein neues Passwort setzen.");
+            if (typeof logSuper === "function" && isSuperAdmin()) await logSuper("otp_password", name, { userId: id });
+            await logActivity("otp_password", name);
+            toast("OTP für " + name + " erzeugt");
+          } else if (act === "ban") {
+            const reason = prompt("Grund für die Sperre (optional):", "") || "";
+            const { error } = await sb.from("user_bans").upsert({
+              user_id: id,
+              user_email: (btn.dataset.email || (name + "@lukio.site")).toLowerCase(),
+              reason,
+              banned_by: user.email,
+              active: true
+            }, { onConflict: "user_email" });
+            // upsert may fail without unique - try insert
+            if (error) {
+              await sb.from("user_bans").insert({
+                user_id: id,
+                user_email: (btn.dataset.email || (name + "@lukio.site")).toLowerCase(),
+                reason,
+                banned_by: user.email,
+                active: true
+              });
+            }
+            await logActivity("user_ban", name);
+            if (isSuperAdmin()) await logSuper("user_ban", name, { userId: id, reason });
+            toast(name + " gesperrt");
+            loadUserBans();
           } else if (act === "del") {
             if (!confirm(name + " wirklich löschen? Der Account ist danach weg.")) return;
             await adminUsersApi({ action: "delete", userId: id });
@@ -2211,10 +2327,35 @@ function updateOpenCount() {
 }
 
 /* ─── Personal ─── */
+
+/** Fälligkeitsdatum vor mehr als 14 Tagen → automatisch löschen */
+function dueCutoffISO(days = 14) {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - days);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+async function cleanupOldHomework() {
+  if (!user) return;
+  const cutoff = dueCutoffISO(14);
+  try {
+    // Persönlich: nur eigene, mit due < cutoff
+    await sb.from(TABLE).delete().eq("user_id", user.id).lt("due", cutoff).not("due", "is", null);
+  } catch (e) { console.warn("cleanup personal", e); }
+  try {
+    // Klassen-HÜ: Admins löschen global alte; alle dürfen versuchen (RLS entscheidet)
+    if (isAdmin()) {
+      await sb.from(CLASS_TABLE).delete().lt("due", cutoff).not("due", "is", null);
+    }
+  } catch (e) { console.warn("cleanup class", e); }
+}
+
 async function loadPersonal() {
+  await cleanupOldHomework();
   const { data, error } = await sb.from(TABLE).select("*").order("sort_order", { ascending: true }).order("due", { ascending: true, nullsFirst: false });
   if (error) { toast("Persönliche HÜ konnten nicht geladen werden."); return; }
-  items = data || [];
+  const cutoff = dueCutoffISO(14);
+  items = (data || []).filter(it => !it.due || it.due >= cutoff);
   renderPersonal();
 }
 function matchesAdv(it) {
@@ -2276,7 +2417,7 @@ function renderPersonal() {
         <svg viewBox="0 0 24 24"><polyline points="5 13 10 18 19 7"/></svg>
       </button>
       <button class="body" type="button">
-        <p class="subject">${esc(subjectLabel(it.subject) || "")}${it.important ? " · Wichtig" : ""}</p>
+        <p class="subject" style="color:${subjectColor(it.subject)}">${esc(subjectLabel(it.subject) || "")}${it.important ? " · Wichtig" : ""}</p>
         <p class="title">${esc(it.title)}</p>
         ${it.note ? `<div class="note md-body">${formatMd(it.note)}</div>` : ""}
       </button>
@@ -2509,7 +2650,7 @@ function renderClass() {
     card.innerHTML = `
       <div class="class-top">
         <div>
-          <p class="subject">${esc(subjectLabel(it.subject) || "")}</p>
+          <p class="subject" style="color:${subjectColor(it.subject)}">${esc(subjectLabel(it.subject) || "")}</p>
           <h3>${esc(it.title)}</h3>
           ${it.note ? `<div class="note md-body">${formatMd(it.note)}</div>` : ""}
           <p class="added-by">Hinzugefügt von ${esc(it.created_by_name || toName(it.created_by_email))}</p>
@@ -2718,7 +2859,7 @@ function renderUnterlagen() {
     card.innerHTML = `
       <div class="class-top">
         <div>
-          <p class="subject">${esc(subjectLabel(it.subject) || "")}${when ? " · " + esc(when) : ""}</p>
+          <p class="subject" style="color:${subjectColor(it.subject)}">${esc(subjectLabel(it.subject) || "")}${when ? " · " + esc(when) : ""}</p>
           <h3>${esc(it.title)}</h3>
           ${it.note ? `<div class="note md-body">${formatMd(it.note)}</div>` : ""}
           <p class="added-by">Von ${esc(it.created_by_name || toName(it.created_by_email))}</p>
@@ -3066,7 +3207,7 @@ async function loadTests() {
     card.innerHTML = `
       <div class="class-top">
         <div>
-          <p class="subject">${esc(kindLabel)}${it.subject ? " · " + esc(subjectLabel(it.subject)) : ""}</p>
+          <p class="subject" style="color:${it.subject ? subjectColor(it.subject) : "var(--indigo)"}">${esc(kindLabel)}${it.subject ? " · " + esc(subjectLabel(it.subject)) : ""}</p>
           <h3>${esc(it.title)}</h3>
           ${it.stoff ? `<div class="note md-body">${formatMd(it.stoff)}</div>` : ""}
           <p class="added-by">Eingetragen von ${esc(it.created_by_name || toName(it.created_by_email) || "Admin")}</p>
@@ -3273,11 +3414,243 @@ $("testSaveBtn")?.addEventListener("click", async () => {
 /* ─── Textformatierung (leichtes Markdown) ─── */
 
 /* ─── Super Admin ─── */
+
+async function logSuper(action, detail = "", meta = {}) {
+  if (!isSuperAdmin()) return;
+  try {
+    await sb.from("super_admin_logs").insert({
+      actor_email: user?.email || "",
+      action,
+      detail: String(detail || "").slice(0, 500),
+      meta
+    });
+  } catch (e) { console.warn("super log", e); }
+}
+
+async function loadUserBans() {
+  const list = $("userBanList");
+  if (!list || !isAdmin()) return;
+  const { data } = await sb.from("user_bans").select("*").eq("active", true).order("created_at", { ascending: false });
+  list.innerHTML = "";
+  if (!data?.length) {
+    list.innerHTML = '<p class="field-help">Keine gesperrten User.</p>';
+    return;
+  }
+  data.forEach(b => {
+    const row = document.createElement("div");
+    row.className = "permission-row";
+    row.style.cssText = "display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--rule)";
+    const name = (b.user_email || "").split("@")[0];
+    row.innerHTML = `<span><strong>${esc(name)}</strong><span class="field-help" style="display:block;margin:0">${esc(b.reason || "—")} · von ${esc(b.banned_by || "?")}</span></span>`;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "small-btn";
+    btn.textContent = "Entsperren";
+    btn.onclick = async () => {
+      await sb.from("user_bans").update({ active: false }).eq("id", b.id);
+      await logActivity("user_unban", name);
+      if (isSuperAdmin()) await logSuper("user_unban", name);
+      toast(name + " entsperrt");
+      loadUserBans();
+    };
+    row.appendChild(btn);
+    list.appendChild(row);
+  });
+}
+
+
+async function checkOtpPending() {
+  if (!user) return false;
+  const pending = !!(user.user_metadata?.otp_pending);
+  if (!pending) return false;
+  const modal = $("otpForceModal");
+  if (!modal) return false;
+  modal.hidden = false;
+  document.body.classList.add("state-lock");
+  return true;
+}
+$("otpForceSave")?.addEventListener("click", async () => {
+  const p1 = $("otpNewPass")?.value || "";
+  const p2 = $("otpNewPass2")?.value || "";
+  const err = $("otpForceErr");
+  if (err) err.textContent = "";
+  if (p1.length < 6) { if (err) err.textContent = "Mindestens 6 Zeichen."; return; }
+  if (p1 !== p2) { if (err) err.textContent = "Passwörter stimmen nicht überein."; return; }
+  try {
+    const { error } = await sb.auth.updateUser({
+      password: p1,
+      data: { otp_pending: false }
+    });
+    if (error) throw error;
+    $("otpForceModal").hidden = true;
+    document.body.classList.remove("state-lock");
+    toast("Passwort gespeichert");
+    const { data: { user: u } } = await sb.auth.getUser();
+    if (u) user = u;
+  } catch (e) {
+    if (err) err.textContent = e.message || String(e);
+  }
+});
+
+async function checkUserBan() {
+  if (!user?.email) return false;
+  // Admins können nicht per User-Ban gesperrt werden
+  if (isAdmin()) return false;
+  const email = (user.email || "").toLowerCase();
+  let data = null, error = null;
+  try {
+    const r1 = await sb.from("user_bans").select("reason,id,user_email,user_id")
+      .eq("active", true).eq("user_email", email).limit(1);
+    data = r1.data; error = r1.error;
+    if ((!data || !data.length) && user.id) {
+      const r2 = await sb.from("user_bans").select("reason,id,user_email,user_id")
+        .eq("active", true).eq("user_id", user.id).limit(1);
+      data = r2.data; error = r2.error || error;
+    }
+  } catch (e) {
+    console.warn("checkUserBan", e);
+    return false;
+  }
+  if (error) console.warn("checkUserBan error", error);
+  if (data?.length) {
+    $("app").hidden = true;
+    $("auth").hidden = true;
+    showBanScreen(data[0].reason || "Account gesperrt", null);
+    if ($("banTitle")) $("banTitle").textContent = "Account gesperrt";
+    if ($("banSub")) $("banSub").textContent = "Dein Account wurde von einem Admin gesperrt. Bei einem Fehler wende dich an DaWeed oder Nico.";
+    user = null;
+    try { await sb.auth.signOut(); } catch {}
+    return true;
+  }
+  return false;
+}
+
+let pendingAdminMsg = null;
+async function checkAdminMessages() {
+  if (!user?.email) return;
+  const email = (user.email || "").toLowerCase();
+  let data = null;
+  try {
+    const r = await sb.from("admin_messages")
+      .select("*")
+      .eq("to_email", email)
+      .is("read_at", null)
+      .order("created_at", { ascending: true })
+      .limit(1);
+    data = r.data;
+    if (r.error) console.warn("admin_messages", r.error);
+  } catch (e) { console.warn(e); return; }
+  if (!data?.length) return;
+  pendingAdminMsg = data[0];
+  const modal = $("adminMsgModal");
+  if (!modal) return;
+  $("adminMsgBody").textContent = pendingAdminMsg.body || "";
+  $("adminMsgReply").value = "";
+  modal.hidden = false;
+  document.body.classList.add("state-lock");
+}
+
+async function dismissAdminMsg(sendReply) {
+  if (!pendingAdminMsg) {
+    $("adminMsgModal").hidden = true;
+    document.body.classList.remove("state-lock");
+    return;
+  }
+  const reply = ($("adminMsgReply")?.value || "").trim();
+  const patch = { read_at: new Date().toISOString() };
+  if (sendReply && reply) {
+    patch.reply = reply;
+    patch.replied_at = new Date().toISOString();
+  }
+  try {
+    await sb.from("admin_messages").update(patch).eq("id", pendingAdminMsg.id);
+  } catch (e) { console.warn(e); }
+  pendingAdminMsg = null;
+  $("adminMsgModal").hidden = true;
+  if ($("banScreen")?.hidden !== false && $("maintScreen")?.hidden !== false) {
+    document.body.classList.remove("state-lock");
+  }
+  if (sendReply && reply) toast("Antwort gesendet");
+}
+
+$("adminMsgSend")?.addEventListener("click", () => dismissAdminMsg(true));
+$("adminMsgSkip")?.addEventListener("click", () => dismissAdminMsg(false));
+
+$("superMsgSend")?.addEventListener("click", async () => {
+  if (!isSuperAdmin()) return;
+  const name = ($("superMsgUser")?.value || "").trim().toLowerCase();
+  const body = ($("superMsgBody")?.value || "").trim();
+  const st = $("superMsgStatus");
+  if (!name || !body) { if (st) st.textContent = "User und Nachricht nötig."; return; }
+  const email = name.includes("@") ? name : name + "@" + (cfg.EMAIL_DOMAIN || "lukio.site");
+  try {
+    let toId = null;
+    try {
+      const data = await adminUsersApi({ action: "list" });
+      const found = (data.users || []).find(u => (u.email || "").toLowerCase() === email.toLowerCase());
+      toId = found?.id || null;
+    } catch {}
+    const { error } = await sb.from("admin_messages").insert({
+      to_user_id: toId,
+      to_email: email.toLowerCase(),
+      from_email: user.email,
+      body
+    });
+    if (error) throw error;
+    await logSuper("admin_message", email, { body: body.slice(0, 100) });
+    if (st) st.textContent = "Gesendet an " + email;
+    $("superMsgBody").value = "";
+    loadSuperMessages();
+  } catch (e) {
+    if (st) st.textContent = e.message || String(e);
+  }
+});
+
+async function loadSuperMessages() {
+  const box = $("superMsgList");
+  if (!box || !isSuperAdmin()) return;
+  const { data } = await sb.from("admin_messages").select("*").order("created_at", { ascending: false }).limit(30);
+  box.innerHTML = "";
+  if (!data?.length) { box.innerHTML = '<p class="field-help">Noch keine Nachrichten.</p>'; return; }
+  data.forEach(m => {
+    const row = document.createElement("div");
+    row.style.cssText = "padding:10px 0;border-bottom:1px solid var(--rule)";
+    const to = (m.to_email || "").split("@")[0];
+    row.innerHTML = `<strong>→ ${esc(to)}</strong>
+      <div class="field-help" style="margin:4px 0">${esc(m.body)}</div>
+      ${m.reply ? `<div style="margin-top:6px;padding:8px;background:var(--soft-2);border-radius:10px"><strong>Antwort:</strong> ${esc(m.reply)}</div>` : `<span class="field-help">${m.read_at ? "gelesen" : "ungelesen"}</span>`}
+      <span class="field-help" style="display:block">${esc(new Date(m.created_at).toLocaleString("de-AT"))}</span>`;
+    box.appendChild(row);
+  });
+}
+
+async function loadSuperLogs() {
+  const box = $("superLogList");
+  if (!box || !isSuperAdmin()) return;
+  const { data, error } = await sb.from("super_admin_logs").select("*").order("created_at", { ascending: false }).limit(80);
+  box.innerHTML = "";
+  if (error) { box.innerHTML = `<p class="field-help">${esc(error.message)}</p>`; return; }
+  if (!data?.length) { box.innerHTML = '<p class="field-help">Noch keine Einträge.</p>'; return; }
+  data.forEach(l => {
+    const row = document.createElement("div");
+    row.style.cssText = "padding:8px 0;border-bottom:1px solid var(--rule);font-size:14px";
+    row.innerHTML = `<strong>${esc(l.action)}</strong> · ${esc(l.detail || "")}
+      <span class="field-help" style="display:block">${esc(l.actor_email || "")} · ${esc(new Date(l.created_at).toLocaleString("de-AT"))}</span>`;
+    box.appendChild(row);
+  });
+}
+
+$("superLogRefresh")?.addEventListener("click", () => loadSuperLogs());
+
+
 async function loadSuperAdminPanel() {
   if (!isSuperAdmin()) return;
   await loadSuperUserList();
   await loadSuperRoleAdmins();
   await refreshSuperRateStatus();
+  await loadSuperMessages();
+  await loadSuperLogs();
+  await logSuper("open_super_panel", "panel");
 }
 
 async function loadSuperUserList() {
@@ -3285,8 +3658,8 @@ async function loadSuperUserList() {
   if (!box) return;
   box.innerHTML = '<p class="field-help">Lade …</p>';
   try {
-    const r = await callNotifyFunction("admin-users", { action: "list" });
-    const users = r?.users || [];
+    const data = await adminUsersApi({ action: "list" });
+    const users = data?.users || [];
     const q = (($("superUserSearch")?.value) || "").trim().toLowerCase();
     const filtered = q ? users.filter(u => (u.name || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q)) : users;
     if (!filtered.length) {
@@ -3331,7 +3704,7 @@ async function impersonateUser(userId, label) {
   const msg = $("superImpersonateMsg");
   if (msg) msg.textContent = "Wechsle …";
   try {
-    const r = await callNotifyFunction("admin-users", { action: "impersonate", userId });
+    const r = await adminUsersApi({ action: "impersonate", userId });
     if (!r?.token_hash) throw new Error(r?.error || "Kein Token");
     const { data, error } = await sb.auth.verifyOtp({
       token_hash: r.token_hash,
@@ -3339,6 +3712,7 @@ async function impersonateUser(userId, label) {
     });
     if (error) throw error;
     try { sessionStorage.setItem("hu-impersonating", "1"); } catch {}
+    await logSuper("impersonate", r.name || label, { userId });
     toast("Angemeldet als " + (r.name || label));
     location.reload();
   } catch (e) {
@@ -3362,8 +3736,8 @@ async function loadSuperRoleAdmins() {
       }
     }
     await loadExtraAdmins();
-    const r = await callNotifyFunction("admin-users", { action: "list" });
-    const users = r?.users || [];
+    const data = await adminUsersApi({ action: "list" });
+    const users = data?.users || [];
     box.innerHTML = "";
     const adminSet = new Set([...ADMIN_EMAILS, ...extraAdmins]);
     users.filter(u => adminSet.has((u.email || "").toLowerCase())).forEach(u => {

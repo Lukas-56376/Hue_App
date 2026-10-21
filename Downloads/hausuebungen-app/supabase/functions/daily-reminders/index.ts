@@ -290,7 +290,20 @@ Deno.serve(async req => {
       ]);
     } catch { /* ignore */ }
 
-    return json({ date: today, hour: now.hour, sent, force });
+
+    // HÜ älter als 14 Tage nach Fälligkeit löschen
+    let deletedPersonal = 0, deletedClass = 0;
+    try {
+      const cutoff = addDaysISO(today, -14);
+      const { data: delP, error: e1 } = await supabase.from("hausuebungen")
+        .delete().lt("due", cutoff).not("due", "is", null).select("id");
+      if (!e1) deletedPersonal = (delP || []).length;
+      const { data: delC, error: e2 } = await supabase.from("klassen_huebungen")
+        .delete().lt("due", cutoff).not("due", "is", null).select("id");
+      if (!e2) deletedClass = (delC || []).length;
+    } catch { /* ignore */ }
+
+    return json({ date: today, hour: now.hour, sent, force, deletedPersonal, deletedClass });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }
