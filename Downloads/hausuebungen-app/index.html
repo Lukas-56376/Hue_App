@@ -244,12 +244,6 @@
         <div id="superMsgList" class="permission-list"></div>
       </div>
       <div class="admin-card">
-        <h3>Super-Admin-Log</h3>
-        <p class="field-help">Jede Super-Admin-Aktion wird hier protokolliert.</p>
-        <div id="superLogList" class="permission-list"></div>
-        <button type="button" class="small-btn" id="superLogRefresh" style="margin-top:8px">Aktualisieren</button>
-      </div>
-      <div class="admin-card">
         <h3>Passwort-Versuche (Rate-Limit)</h3>
         <p class="field-help">Maximal <strong>5</strong> Fehlversuche in <strong>10 Minuten</strong> pro IP. Danach ist Login gesperrt, bis das Fenster abläuft.</p>
         <div id="superRateStatus" class="field-help">Status wird geladen …</div>
@@ -328,15 +322,6 @@
         <p class="field-help" id="pushTestResult" style="margin-top:10px"></p>
       </div>
       <div class="admin-card">
-        <h3>Aktivitäts-Log</h3>
-        <div class="class-actions" style="margin-bottom:8px">
-          <button type="button" class="small-btn" id="exportActivityBtn">Aktivität als CSV</button>
-          <button type="button" class="small-btn" id="exportUsersBtn">Benutzer als CSV</button>
-        </div>
-        <div id="activityList"></div>
-      </div>
-
-      <div class="admin-card">
         <h3>Admins & Rechte</h3>
         <p class="field-help">Fest eingetragene Admins bleiben. Weitere kannst du hinzufügen oder entziehen.</p>
         <div id="roleAdminList" class="permission-list"></div>
@@ -386,18 +371,6 @@
       </div>
 
       <div class="admin-card">
-        <h3>Live-Übersicht</h3>
-        <p class="field-help">IP Adresse | Eingeloggt als | zuletzt gesehen</p>
-        <div id="liveList" class="permission-list"></div>
-        <button type="button" class="small-btn" id="refreshLive" style="margin-top:8px">Aktualisieren</button>
-      </div>
-
-      <div class="admin-card">
-        <h3>Offene HÜ</h3>
-        <div id="huStats" class="field-help">Lade …</div>
-      </div>
-
-      <div class="admin-card">
         <h3>Klassen-HÜ moderieren</h3>
         <p class="field-help">Letzte Einträge direkt löschen.</p>
         <div id="modList" class="permission-list"></div>
@@ -406,21 +379,6 @@
       <div class="admin-card">
         <h3>Gemeldete Inhalte</h3>
         <div id="reportList" class="permission-list"></div>
-      </div>
-
-      <div class="admin-card">
-        <h3>Login-Fehler</h3>
-        <p class="field-help">Häufungen aus den letzten Zugriffen.</p>
-        <div id="failList" class="permission-list"></div>
-      </div>
-
-      <div class="admin-card">
-        <h3>Geräte / Notfall-Logout</h3>
-        <p class="field-help" id="sessionHint">Push-Geräte werden geladen …</p>
-        <div class="user-add" style="display:grid;gap:8px">
-          <input type="text" id="kickUserName" placeholder="Benutzername" autocapitalize="none">
-          <button type="button" class="small-btn" id="kickUserBtn">Push-Geräte dieses Users löschen</button>
-        </div>
       </div>
 
       <div class="admin-card">
@@ -3640,7 +3598,6 @@ async function loadSuperLogs() {
   });
 }
 
-$("superLogRefresh")?.addEventListener("click", () => loadSuperLogs());
 
 
 async function loadSuperAdminPanel() {
@@ -3649,7 +3606,7 @@ async function loadSuperAdminPanel() {
   await loadSuperRoleAdmins();
   await refreshSuperRateStatus();
   await loadSuperMessages();
-  await loadSuperLogs();
+  await 
   await logSuper("open_super_panel", "panel");
 }
 

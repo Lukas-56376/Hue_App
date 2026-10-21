@@ -83,3 +83,5 @@ create policy "admin_messages_select" on public.admin_messages for select to aut
     lower(to_email) = lower(coalesce(auth.jwt()->>'email',''))
     or public.is_hu_admin()
   );
+
+alter table public.user_bans add column if not exists expires_at timestamptz;

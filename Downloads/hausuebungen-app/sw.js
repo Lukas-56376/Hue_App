@@ -1,4 +1,4 @@
-const CACHE = "hu-shell-v14";
+const CACHE = "hu-shell-v15";
 const SHELL = ["./", "./index.html", "./style.css", "./config.js", "./manifest.json", "./icon.jpg"];
 
 self.addEventListener("install", event => {
