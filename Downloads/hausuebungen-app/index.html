@@ -2585,9 +2585,11 @@ $("filterImportant").onchange = () => { filterImportant = $("filterImportant").c
 
 /* ─── Class ─── */
 async function loadClass() {
+  if (!user?.id) { classItems = []; classDone = new Set(); renderClass(); return; }
   const [{ data: cls, error: e1 }, { data: comps }] = await Promise.all([
     sb.from(CLASS_TABLE).select("*").order("due", { ascending: true, nullsFirst: false }).order("created_at", { ascending: false }),
-    sb.from(COMP_TABLE).select("class_hu_id").eq("done", true)
+    // Nur EIGENE Erledigungen — sonst sehen alle, was andere abgehakt haben
+    sb.from(COMP_TABLE).select("class_hu_id").eq("done", true).eq("user_id", user.id)
   ]);
   if (e1) { toast("Klassen-HÜ konnten nicht geladen werden."); return; }
   classItems = cls || [];
