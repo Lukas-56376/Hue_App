@@ -312,7 +312,7 @@
         <button type="button" class="small-btn" id="refreshIpLog" style="margin-top:8px">Aktualisieren</button>
         <button type="button" class="small-btn" id="previewBanBtn" style="margin-top:8px">Vorschau Ban</button>
       </div>
-      <div class="admin-card">
+      <div class="admin-card" id="resetCodesAdminCard">
         <h3>Passwort-Reset-Codes</h3>
         <p class="field-help">Codes, die User angefordert haben.</p>
         <div id="resetCodeList" class="permission-list"></div>
@@ -774,8 +774,8 @@ function setMainView(next, opts = {}) {
     if (isAdmin()) {
       loadAdminUsers(); loadUserAdmin(); loadActivity(); refreshPushStatus(); loadResetCodes(); loadIpAdmin(); loadAdminHub(); loadUserBans();
     } else {
-      // nur Broadcast
-      try { loadAdminHub?.(); } catch {}
+      // Broadcast + Reset-Codes
+      try { loadResetCodes(); } catch {}
       try { if (typeof loadBroadcastFeed === "function") loadBroadcastFeed(); } catch {}
     }
   }
@@ -847,7 +847,7 @@ function updateAdminUI() {
   if (adminView) {
     adminView.querySelectorAll(".admin-card").forEach(card => {
       if (isBroadcastOnly()) {
-        card.hidden = card.id !== "broadcastAdminCard";
+        card.hidden = !(card.id === "broadcastAdminCard" || card.id === "resetCodesAdminCard");
       } else if (isAdmin()) {
         card.hidden = false;
       }

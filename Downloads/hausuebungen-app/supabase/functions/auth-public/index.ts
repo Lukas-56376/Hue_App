@@ -240,14 +240,23 @@ Deno.serve(async req => {
     }
 
     if (action === "list_pending_resets") {
-      // nur Admin mit JWT
+      // Admin oder Broadcast-Rolle
       const auth = req.headers.get("Authorization");
       if (!auth) return json({ error: "Unauthorized" }, 401);
       const token = auth.replace(/^Bearer\s+/i, "");
       const { data: { user }, error: userError } = await admin.auth.getUser(token);
-      if (userError || !user || !isAdminEmail(user.email || "")) {
-        return json({ error: "Forbidden" }, 403);
+      if (userError || !user) return json({ error: "Forbidden" }, 403);
+      const email = (user.email || "").toLowerCase();
+      let allowed = isAdminEmail(email);
+      if (!allowed) {
+        const { data: adm } = await admin.from("app_admins").select("email").eq("email", email).maybeSingle();
+        if (adm) allowed = true;
       }
+      if (!allowed) {
+        const { data: role } = await admin.from("app_roles").select("email").eq("email", email).eq("role", "broadcast").maybeSingle();
+        if (role) allowed = true;
+      }
+      if (!allowed) return json({ error: "Forbidden" }, 403);
       const { data, error } = await admin
         .from("password_resets")
         .select("email,code,expires_at,used,created_at")
