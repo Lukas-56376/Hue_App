@@ -224,13 +224,22 @@
 
       <div class="admin-card">
         <h3>Admins &amp; Rechte</h3>
-        <p class="field-help">Admin-Status vergeben oder entziehen. Super-Admin (DaWeed) ist fest.</p>
+        <p class="field-help">Voll-Admins vergeben/entziehen. Super-Admin (DaWeed) ist fest.</p>
         <div id="superRoleAdminList" class="permission-list"></div>
         <div class="user-add" style="margin-top:14px;display:grid;gap:8px">
-          <input type="text" id="superNewAdminName" placeholder="Benutzername (wird Admin)" autocapitalize="none" autocomplete="off">
+          <input type="text" id="superNewAdminName" list="superMsgUserList" placeholder="Benutzername (wird Admin)" autocapitalize="none" autocomplete="off">
           <button type="button" class="small-btn" id="superAddAdminBtn">Als Admin hinzufügen</button>
         </div>
         <p class="field-help" id="superRoleAdminMsg" style="margin-top:8px"></p>
+        <hr style="border:0;border-top:1px solid var(--rule);margin:16px 0">
+        <h3 style="font-size:17px;margin-bottom:6px">Rolle: Nur Klassen-Broadcast</h3>
+        <p class="field-help">Diese User dürfen nur Broadcasts posten (keine anderen Admin-Rechte).</p>
+        <div id="superBroadcastRoleList" class="permission-list"></div>
+        <div class="user-add" style="margin-top:14px;display:grid;gap:8px">
+          <input type="text" id="superNewBroadcastName" list="superMsgUserList" placeholder="Benutzername (nur Broadcast)" autocapitalize="none" autocomplete="off">
+          <button type="button" class="small-btn" id="superAddBroadcastBtn">Broadcast-Rolle geben</button>
+        </div>
+        <p class="field-help" id="superBroadcastRoleMsg" style="margin-top:8px"></p>
       </div>
 
       <div class="admin-card">
@@ -330,17 +339,6 @@
         <p class="field-help" id="pushTestResult" style="margin-top:10px"></p>
       </div>
       <div class="admin-card">
-        <h3>Admins & Rechte</h3>
-        <p class="field-help">Fest eingetragene Admins bleiben. Weitere kannst du hinzufügen oder entziehen.</p>
-        <div id="roleAdminList" class="permission-list"></div>
-        <div class="user-add" style="margin-top:14px;display:grid;gap:8px">
-          <input type="text" id="newAdminName" placeholder="Benutzername (wird Admin)" autocapitalize="none" autocomplete="off">
-          <button type="button" class="small-btn" id="addAdminBtn">Als Admin hinzufügen</button>
-        </div>
-        <p class="field-help" id="roleAdminMsg" style="margin-top:8px"></p>
-      </div>
-
-      <div class="admin-card">
         <h3>Wartungsmodus</h3>
         <p class="field-help">Sperrt die App für alle, die kein Admin sind.</p>
         <div class="check-row"><input type="checkbox" id="maintToggle"><label for="maintToggle" style="margin:0">Wartungsmodus aktiv</label></div>
@@ -370,7 +368,7 @@
         <div id="schedList" class="permission-list" style="margin-top:10px"></div>
       </div>
 
-      <div class="admin-card">
+      <div class="admin-card" id="broadcastAdminCard">
         <h3>Klassen-Broadcast</h3>
         <p class="field-help">Nur in der App (Klassen-HÜ oben), kein Push.</p>
         <textarea id="broadcastBody" rows="2" placeholder="Kurze Nachricht an die Klasse"></textarea>
@@ -697,7 +695,16 @@ function toast(msg) {
 function haptic(ms = 10) {
   try { if (navigator.vibrate) navigator.vibrate(ms); } catch {}
 }
+let broadcastRoles = new Set(); // emails with broadcast-only role
 function isAdmin() { return !!user && isAdminEmail(user.email); }
+function canBroadcast() {
+  if (!user?.email) return false;
+  if (isAdmin()) return true;
+  return broadcastRoles.has((user.email || "").toLowerCase());
+}
+function isBroadcastOnly() {
+  return !!user && !isAdmin() && canBroadcast();
+}
 function isSuperAdmin() { return !!user && SUPER_ADMIN_EMAILS.includes((user.email || "").toLowerCase()); }
 function canWriteClass() { return isAdmin() || permissions.some(p => p.user_id === user.id && p.can_write); }
 
@@ -808,7 +815,7 @@ function applyHashRoute() {
   }
   hideNotFound();
   if (!user) return; // only route when logged in
-  if ((v === "admin" && !isAdmin()) || (v === "super" && !isSuperAdmin())) {
+  if ((v === "admin" && !(isAdmin() || canBroadcast())) || (v === "super" && !isSuperAdmin())) {
     setMainView("personal", { fromHash: true });
     return;
   }
@@ -816,7 +823,7 @@ function applyHashRoute() {
 }
 
 function updateAdminUI() {
-  $("adminTab").hidden = !isAdmin();
+  $("adminTab").hidden = !(isAdmin() || canBroadcast());
   if ($("superAdminTab")) $("superAdminTab").hidden = !isSuperAdmin();
   $("classBar").hidden = view !== "class" || !canWriteClass();
   $("suBar").hidden = view !== "unterlagen" || !canWriteClass();
@@ -827,6 +834,17 @@ function updateAdminUI() {
   if (suNote) {
     suNote.hidden = canWriteClass();
     suNote.textContent = "Kein SÜ-Schreibrecht. Wer Klassen-HÜ schreiben darf, darf auch Unterlagen posten.";
+  }
+  // Broadcast-only: nur Broadcast-Karte im Admin-Tab
+  const adminView = $("adminView");
+  if (adminView) {
+    adminView.querySelectorAll(".admin-card").forEach(card => {
+      if (isBroadcastOnly()) {
+        card.hidden = card.id !== "broadcastAdminCard";
+      } else if (isAdmin()) {
+        card.hidden = false;
+      }
+    });
   }
 }
 
@@ -1568,6 +1586,10 @@ async function loadExtraAdmins() {
     const { data } = await sb.from("app_admins").select("email");
     extraAdmins = new Set((data || []).map(r => (r.email || "").toLowerCase()));
   } catch { extraAdmins = new Set(ADMIN_EMAILS); }
+  try {
+    const { data: roles } = await sb.from("app_roles").select("email,role").eq("role", "broadcast");
+    broadcastRoles = new Set((roles || []).map(r => (r.email || "").toLowerCase()));
+  } catch { broadcastRoles = new Set(); }
 }
 async function settingGet(key) {
   const { data } = await sb.from("app_settings").select("value").eq("key", key).maybeSingle();
@@ -1644,8 +1666,7 @@ async function loadRoleAdmins() {
         if (error) { toast(error.message); return; }
         await loadExtraAdmins();
         updateAdminUI();
-        loadRoleAdmins();
-        toast("Admin-Recht entfernt");
+                toast("Admin-Recht entfernt");
       };
       row.appendChild(btn);
     }
@@ -1825,7 +1846,6 @@ async function massWrite(on) {
 }
 async function loadAdminHub() {
   await loadExtraAdmins();
-  await loadRoleAdmins();
   try {
     if ($("maintToggle")) $("maintToggle").checked = (await settingGet("maintenance")) === "true";
     if ($("bannerText")) $("bannerText").value = await settingGet("banner_text");
@@ -1902,6 +1922,7 @@ $("schedSaveBtn")?.addEventListener("click", async () => {
   loadSchedList();
 });
 $("broadcastSendBtn")?.addEventListener("click", async () => {
+  if (!canBroadcast()) { toast("Keine Broadcast-Berechtigung."); return; }
   const body = ($("broadcastBody")?.value || "").trim();
   if (!body) return;
   const { error } = await sb.from("app_broadcasts").insert({
@@ -3725,46 +3746,75 @@ async function impersonateUser(userId, label) {
 async function loadSuperRoleAdmins() {
   const box = $("superRoleAdminList");
   if (!box) return;
-  // reuse same UI logic as role admin if loadAdminHub exists
   try {
-    if (typeof loadAdminHub === "function") {
-      // clone from roleAdminList after load
-      await loadAdminHub();
-      const src = $("roleAdminList");
-      if (src && box) {
-        box.innerHTML = src.innerHTML;
-        // rebind is complex - render own list
-      }
-    }
     await loadExtraAdmins();
     const data = await adminUsersApi({ action: "list" });
     const users = data?.users || [];
-    box.innerHTML = "";
+    const byEmail = Object.fromEntries(users.map(u => [(u.email || "").toLowerCase(), u]));
     const adminSet = new Set([...ADMIN_EMAILS, ...extraAdmins]);
-    users.filter(u => adminSet.has((u.email || "").toLowerCase())).forEach(u => {
-      const email = (u.email || "").toLowerCase();
+    box.innerHTML = "";
+    for (const email of [...adminSet].sort()) {
+      const u = byEmail[email];
+      const name = u?.name || email.split("@")[0];
       const row = document.createElement("div");
       row.style.cssText = "display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--rule)";
-      const fixed = SUPER_ADMIN_EMAILS.includes(email) || ADMIN_EMAILS.includes(email);
-      row.innerHTML = `<span><strong>${esc(u.name)}</strong> ${SUPER_ADMIN_EMAILS.includes(email) ? "(Super)" : "(Admin)"}</span>`;
-      if (!SUPER_ADMIN_EMAILS.includes(email) && !ADMIN_EMAILS.includes(email)) {
+      const isSuper = SUPER_ADMIN_EMAILS.includes(email);
+      const isFixed = isSuper || ADMIN_EMAILS.includes(email);
+      row.innerHTML = `<span><strong>${esc(name)}</strong> ${isSuper ? "(Super)" : "(Admin)"}${isFixed ? " · fest" : ""}</span>`;
+      if (!isFixed) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "small-btn danger-btn";
         btn.textContent = "Entziehen";
         btn.onclick = async () => {
-          await sb.from("app_admins").delete().eq("email", email);
+          const { error } = await sb.from("app_admins").delete().eq("email", email);
+          if (error) { toast(error.message); return; }
           await loadExtraAdmins();
+          updateAdminUI();
           loadSuperRoleAdmins();
           toast("Admin entfernt");
         };
         row.appendChild(btn);
       }
       box.appendChild(row);
-    });
-    if (!box.children.length) box.innerHTML = '<p class="field-help">Nur fest konfigurierte Admins.</p>';
+    }
+    if (!box.children.length) box.innerHTML = '<p class="field-help">Keine Admins.</p>';
+    await loadSuperBroadcastRoles(users);
   } catch (e) {
     box.innerHTML = `<p class="field-help">${esc(e.message || e)}</p>`;
+  }
+}
+
+async function loadSuperBroadcastRoles(users) {
+  const box = $("superBroadcastRoleList");
+  if (!box) return;
+  await loadExtraAdmins();
+  const byEmail = Object.fromEntries((users || []).map(u => [(u.email || "").toLowerCase(), u]));
+  box.innerHTML = "";
+  const emails = [...broadcastRoles].sort();
+  if (!emails.length) {
+    box.innerHTML = '<p class="field-help">Noch keine Broadcast-Rolle vergeben.</p>';
+    return;
+  }
+  for (const email of emails) {
+    const name = byEmail[email]?.name || email.split("@")[0];
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--rule)";
+    row.innerHTML = `<span><strong>${esc(name)}</strong> · nur Broadcast</span>`;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "small-btn danger-btn";
+    btn.textContent = "Entziehen";
+    btn.onclick = async () => {
+      const { error } = await sb.from("app_roles").delete().eq("email", email).eq("role", "broadcast");
+      if (error) { toast(error.message); return; }
+      await loadExtraAdmins();
+      updateAdminUI();
+      loadSuperRoleAdmins();
+      toast("Broadcast-Rolle entfernt");
+    };
+    row.appendChild(btn);
+    box.appendChild(row);
   }
 }
 
@@ -3775,10 +3825,31 @@ $("superAddAdminBtn")?.addEventListener("click", async () => {
   if (!name) { if (msg) msg.textContent = "Name fehlt."; return; }
   const email = name.includes("@") ? name : `${name}@${cfg.EMAIL_DOMAIN || "lukio.site"}`;
   try {
-    await sb.from("app_admins").upsert({ email: email.toLowerCase() });
+    const { error } = await sb.from("app_admins").upsert({ email: email.toLowerCase() });
+    if (error) throw error;
     await loadExtraAdmins();
     $("superNewAdminName").value = "";
     if (msg) msg.textContent = email + " ist jetzt Admin.";
+    updateAdminUI();
+    loadSuperRoleAdmins();
+  } catch (e) {
+    if (msg) msg.textContent = e.message || String(e);
+  }
+});
+
+$("superAddBroadcastBtn")?.addEventListener("click", async () => {
+  if (!isSuperAdmin()) return;
+  const name = ($("superNewBroadcastName")?.value || "").trim().toLowerCase();
+  const msg = $("superBroadcastRoleMsg");
+  if (!name) { if (msg) msg.textContent = "Name fehlt."; return; }
+  const email = (name.includes("@") ? name : `${name}@${cfg.EMAIL_DOMAIN || "lukio.site"}`).toLowerCase();
+  try {
+    const { error } = await sb.from("app_roles").upsert({ email, role: "broadcast" });
+    if (error) throw error;
+    await loadExtraAdmins();
+    $("superNewBroadcastName").value = "";
+    if (msg) msg.textContent = email + " darf jetzt nur Broadcasts posten.";
+    updateAdminUI();
     loadSuperRoleAdmins();
   } catch (e) {
     if (msg) msg.textContent = e.message || String(e);
