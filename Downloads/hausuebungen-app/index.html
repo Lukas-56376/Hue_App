@@ -769,8 +769,15 @@ function setMainView(next, opts = {}) {
   if (next === "unterlagen") loadUnterlagen();
   if (next === "tests") loadTests();
   if (next === "admin") {
-    if (!isAdmin()) { setMainView("personal"); return; }
-    loadAdminUsers(); loadUserAdmin(); loadActivity(); refreshPushStatus(); loadResetCodes(); loadIpAdmin(); loadAdminHub(); loadUserBans();
+    if (!(isAdmin() || canBroadcast())) { setMainView("personal"); return; }
+    updateAdminUI();
+    if (isAdmin()) {
+      loadAdminUsers(); loadUserAdmin(); loadActivity(); refreshPushStatus(); loadResetCodes(); loadIpAdmin(); loadAdminHub(); loadUserBans();
+    } else {
+      // nur Broadcast
+      try { loadAdminHub?.(); } catch {}
+      try { if (typeof loadBroadcastFeed === "function") loadBroadcastFeed(); } catch {}
+    }
   }
   if (next === "super") {
     if (!isSuperAdmin()) { setMainView("personal"); return; }
